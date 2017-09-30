@@ -2,6 +2,7 @@ import tensorflow as tf
 
 from policies.Policy import Policy
 from policies.GreedyPolicy import GreedyPolicy
+from policies.RandomPolicy import RandomPolicy
 from gym.spaces import Discrete
 
 
@@ -20,7 +21,7 @@ class EpsilonGreedyPolicy(Policy):
         """
 
         assert isinstance(action_space, Discrete)
-        self.max = action_space.n
+        self.action_space = action_space
         self.epsilon = epsilon
 
     def choose_action(self, q):
@@ -34,11 +35,10 @@ class EpsilonGreedyPolicy(Policy):
 
         # get the number of states
         best_action = GreedyPolicy().choose_action(q)
+        random_action = RandomPolicy().choose_action(self.action_space.n)
 
-        random_action = tf.random_uniform([1], maxval=self.max, dtype=tf.int32)
+        # combine both
         random_decision_vector = tf.less(tf.random_uniform([1]), self.epsilon)
-
-        # let the coin decide about the final actions
         final_action = tf.where(random_decision_vector, best_action, random_action)
 
         # pass back the actions and corresponding q values
