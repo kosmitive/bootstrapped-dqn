@@ -2,26 +2,31 @@ import tensorflow as tf
 
 from gym.spaces import Box
 from gym.spaces import Discrete
+from environments.Environment import Environment
+from memory.Memory import Memory
 
 
-class ExperienceReplayMemory:
+class ExperienceReplayMemory(Memory):
     """This class represent a basic replay memory. It can basically
     store the last N tuples.
     """
 
-    def __init__(self, size, sample_size, state_space, action_space):
+    def __init__(self, size, sample_size, env):
         """Constructs a new ReplayMemory.
 
         Args:
             size: The size of the replay memory.
             sample_size: How much samples should be derived.
-            action_space: The action space for the replay memory.
-            state_space: The state space for the replay memory.
         """
 
         # check if this is a valid size
         assert size > 0
         assert sample_size <= size
+        assert isinstance(env, Environment)
+
+        # obtain the spaces
+        state_space = env.observation_space()
+        action_space = env.action_space()
 
         # check if the spaces are valid
         assert isinstance(state_space, Box)
@@ -49,10 +54,11 @@ class ExperienceReplayMemory:
             self.current = tf.Variable(self.counter_init)
 
             # create necessary operations
-            self.reset_op = self.__create_reset_op()
             self.sample_size = sample_size
 
-    def __create_reset_op(self):
+    # ---------------------- Memory Interface ---------------------------
+
+    def reset_graph(self):
         """This method delivers the operation for resetting the
         replay memory."""
 
@@ -60,28 +66,7 @@ class ExperienceReplayMemory:
         reset_current = tf.assign(self.current, self.counter_init)
         return tf.group(reset_count, reset_current)
 
-    def __create_samples(self, sample_size):
-        """This method creates the sampling operation.
-
-        Args:
-            sample_size: How much samples should be derived.
-        """
-
-        # get unique indices
-        permutation = tf.random_shuffle(tf.range(0, self.count, dtype=tf.int32))
-        indices = permutation[:tf.minimum(sample_size, self.count)]
-
-        # gather the values
-        gathered_actions = tf.gather(self.actions, indices)
-        gathered_rewards = tf.gather(self.rewards, indices)
-        gathered_dones = tf.gather(self.dones, indices)
-        gathered_current_states = tf.gather(self.current_states, indices)
-        gathered_next_states = tf.gather(self.next_states, indices)
-
-        # pass back the sampled actions
-        return gathered_current_states, gathered_next_states, gathered_actions, gathered_rewards, gathered_dones
-
-    def create_insert_sample_op(self, current_state, next_state, action, reward, done):
+    def store_graph(self, current_state, next_state, action, reward, done):
         """This method inserts a new tuple into the replay memory.
 
         Args:
@@ -117,6 +102,49 @@ class ExperienceReplayMemory:
                                  increase_current, increase_count)
 
             with tf.control_dependencies([insert_op]):
+                return tf.identity(self.size - self.count)
+
+    def store_and_sample_graph(self, current_state, next_state, action, reward, done):
+        """This method inserts a new tuple into the replay memory.
+
+        Args:
+            current_state: The current_state in a binary encoded fashion.
+            reward: The reward for the action taken
+            action: The action that was taken for the reward
+            next_state: The state after the action was executed.
+            done: Whether the the episode was finished or not.
+        """
+
+        insert_count = self.store_graph(current_state, next_state, action, reward, done)
+
+        # create a new variable scope
+        with tf.variable_scope("replay_memory"):
+            insert_op = tf.group(insert_count)
+            with tf.control_dependencies([insert_op]):
                 samples = self.__create_samples(self.sample_size)
 
             return samples
+
+    # ---------------------- Private Functions ---------------------------
+
+    def __create_samples(self, sample_size):
+        """This method creates the sampling operation.
+
+        Args:
+            sample_size: How much samples should be derived.
+        """
+
+        # get unique indices
+        permutation = tf.random_shuffle(tf.range(0, self.count, dtype=tf.int32))
+        indices = permutation[:tf.minimum(sample_size, self.count)]
+
+        # gather the values
+        gathered_actions = tf.gather(self.actions, indices)
+        gathered_rewards = tf.gather(self.rewards, indices)
+        gathered_dones = tf.gather(self.dones, indices)
+        gathered_current_states = tf.gather(self.current_states, indices)
+        gathered_next_states = tf.gather(self.next_states, indices)
+
+        # pass back the sampled actions
+        return gathered_current_states, gathered_next_states, gathered_actions, gathered_rewards, gathered_dones
+
