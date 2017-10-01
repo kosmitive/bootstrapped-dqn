@@ -23,11 +23,10 @@ class RewardValueFunctionPlot(Plot):
 
         # placeholders so that IDE does not
         # complain
-        self.fig = plt.figure(self.title, figsize=(13,9))
         self.im_value_func = None
         self.im_actions = None
         self.plt_rewards = None
-        self.box = [state_space.low[0], state_space.high[0], state_space.low[1], state_space.high[1]]
+        self.box = [state_space.IB[0], state_space.IE[0], state_space.IB[1], state_space.IE[1]]
 
     def interactive(self):
         self.interactive = True
@@ -41,34 +40,42 @@ class RewardValueFunctionPlot(Plot):
         self.interactive = False
         plt.show()
 
-    def initialize_figure(self):
+    def initialize_figure(self, show_v):
         """Initializes the figures if not happened already"""
 
         if self.initialized: return
+
+        self.fig = plt.figure(self.title, figsize=(13,9))
         self.initialized = True
         margin = 0.08
         half_ratio = 0.5 - 3 * margin / 2
 
-        # create figure and subplots accordingly
-        self.im_value_func = self.fig.add_axes([margin, margin, half_ratio, half_ratio])
-        self.im_value_func.set_title("V-Function")
+        if show_v:
 
-        self.im_actions = self.fig.add_axes([0.5 + margin / 2, margin, half_ratio, half_ratio])
-        self.im_actions.set_title("Q-Greedy")
+            # create figure and subplots accordingly
+            self.im_value_func = self.fig.add_axes([margin, margin, half_ratio, half_ratio])
+            self.im_value_func.set_title("V-Function")
 
-        self.plt_rewards = self.fig.add_axes([margin, 0.5 + margin / 2, 1 - 2 * margin, half_ratio])
-        self.plt_rewards.set_title("Rewards")
+            self.im_actions = self.fig.add_axes([0.5 + margin / 2, margin, half_ratio, half_ratio])
+            self.im_actions.set_title("Q-Greedy")
 
-    def update(self, rewards, q_funcs):
+            self.plt_rewards = self.fig.add_axes([margin, 0.5 + margin / 2, 1 - 2 * margin, half_ratio])
+            self.plt_rewards.set_title("Rewards")
+
+        else:
+
+            self.plt_rewards = self.fig.add_axes([margin, margin, 1 - 2 * margin, 1 - 2 * margin])
+            self.plt_rewards.set_title("Rewards")
+
+    def update(self, rewards, q_funcs, plot_as_variance):
         """This can be used to update the plot. It will prove whether
         the plot was already initialized.
 
         Args:
             rewards: The rewards to plot
             q_funcs: A list of Q-Functions (Mapping to Discrete Actions)
+            plot_as_variance: True if the reward signals shall be displayed as a distribution
         """
-
-        assert len(q_funcs) == self.N
 
         # discard the plot
         if self.initialized:
@@ -76,41 +83,48 @@ class RewardValueFunctionPlot(Plot):
             self.initialized = False
 
         # and reininitialize
-        self.initialize_figure()
-
-        # start with plotting the reward
-        mean_reward = np.mean(rewards, axis=0)
-
-        # plot the confidence interval
+        self.initialize_figure(q_funcs is not None)
         n = len(rewards)
-        l = np.size(rewards, 1)
-        if n > 1:
-            var_reward = np.var(rewards, axis=0)
-            var_offset = 1.96 * np.sqrt(var_reward / n)
-            var_top = mean_reward + var_offset
-            var_bottom = mean_reward - var_offset
-            self.plt_rewards.fill_between(np.arange(0,l), var_top, var_bottom, facecolor='#bbccf7')
 
-        self.plt_rewards.plot(mean_reward, color='#1241b7')
+        if plot_as_variance:
+
+            # start with plotting the reward
+            mean_reward = np.mean(rewards, axis=0)
+
+            # plot the confidence interval
+            l = np.size(rewards, 1)
+            if n > 1:
+                var_reward = np.var(rewards, axis=0)
+                var_offset = 1.96 * np.sqrt(var_reward / n)
+                var_top = mean_reward + var_offset
+                var_bottom = mean_reward - var_offset
+                self.plt_rewards.fill_between(np.arange(0,l), var_top, var_bottom, facecolor='#bbccf7')
+
+            self.plt_rewards.plot(mean_reward, color='#1241b7')
+
+        else:
+            for i in range(n):
+                self.plt_rewards.plot(rewards[i, :], label="M{}".format(i))
         self.plt_rewards.set_xlabel("t")
 
-        # determine best actions and value function
-        stacked_q_funcs = np.stack(q_funcs, axis=2)
-        best_actions = np.argmax(stacked_q_funcs, axis=2)
-        value_function = np.max(stacked_q_funcs, axis=2)
+        if q_funcs is not None:
+            # determine best actions and value function
+            stacked_q_funcs = np.stack(q_funcs, axis=2)
+            best_actions = np.argmax(stacked_q_funcs, axis=2)
+            value_function = np.max(stacked_q_funcs, axis=2)
 
-        # print both plots
-        ba = self.im_actions.imshow(best_actions, interpolation='nearest', cmap=self.act_cmap, vmin=-0.5, vmax=2.5, extent=self.box, aspect='auto')
-        self.im_actions.set_xlabel("x")
-        self.im_actions.yaxis.set_visible(False)
-        ba_cbar = plt.colorbar(ba, ax=self.im_actions, ticks=[0, 1, 2])
-        ba_cbar.set_ticklabels(['Left', 'Nothing', 'Right'])
+            # print both plots
+            ba = self.im_actions.imshow(best_actions, interpolation='nearest', cmap=self.act_cmap, vmin=-0.5, vmax=2.5, extent=self.box, aspect='auto')
+            self.im_actions.set_xlabel("x")
+            self.im_actions.yaxis.set_visible(False)
+            ba_cbar = plt.colorbar(ba, ax=self.im_actions, ticks=[0, 1, 2])
+            ba_cbar.set_ticklabels(['Left', 'Nothing', 'Right'])
 
-        # fill the axes
-        vf = self.im_value_func.imshow(value_function, interpolation='nearest', extent=self.box, aspect='auto')
-        self.im_value_func.set_ylabel("v")
-        self.im_value_func.set_xlabel("x")
-        plt.colorbar(vf, ax=self.im_value_func)
+            # fill the axes
+            vf = self.im_value_func.imshow(value_function, interpolation='nearest', extent=self.box, aspect='auto')
+            self.im_value_func.set_ylabel("v")
+            self.im_value_func.set_xlabel("x")
+            plt.colorbar(vf, ax=self.im_value_func)
         plt.pause(0.01)
 
     def save(self, filename):

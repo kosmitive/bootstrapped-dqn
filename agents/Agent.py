@@ -1,4 +1,8 @@
 class Agent:
+
+    def name(self):
+        raise NotImplementedError()
+
     def register_memory(self, memory):
         raise NotImplementedError()
 

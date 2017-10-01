@@ -1,5 +1,7 @@
 # simply import the numpy package.
 import tensorflow as tf
+from gym.spaces import Box
+from gym.spaces import Discrete
 
 import extensions.tensorflowHelpers as tfh
 from memory.Memory import Memory
@@ -7,21 +9,18 @@ from nn.MultipleActionDeepQNetwork import MultipleActionDeepQNetwork
 from policies.Policy import Policy
 from environments.Environment import Environment
 from agents.Agent import Agent
-from spaces.ContinuousSpace import ContinuousSpace
-from spaces.DiscreteSpace import DiscreteSpace
 
-class DDQNAgent(Agent):
+class BootstrappedDQNAgent(Agent):
     """this is the agent playing the game and trying to maximize the reward."""
 
-    def __init__(self, N, env, structure, config):
+    def __init__(self, env, structure, offset, discount, learning_rate):
         """Constructs a BootstrappedDDQNAgent.
 
         Args:
-            N: The number of independent agents
-            env: The environment
-            structure: Define the number of layers
-            config:
-                - offset: Number of steps till the value should be copied
+            state_space: Give the discrete state space
+            action_space: Give the discrete action space
+            offset: Number of steps till the value should be copied
+            structure: The structure to use for the neural networks
         """
 
         assert isinstance(env, Environment)
@@ -30,20 +29,23 @@ class DDQNAgent(Agent):
         self.state_space = env.observation_space()
         self.action_space = env.action_space()
 
+        # check if the spaces are valid
+        assert isinstance(self.state_space, Box)
+        assert isinstance(self.action_space, Discrete)
+
         # set the internal debug variable
         self.memory = None
         self.policy = None
-        self.copy_offset = config['target_offset']
+        self.copy_offset = offset
         self.iteration = 0
-        self.N = N
 
         # save these numbers
-        self.discount = config['discount']
-        self.learning_rate = config['learning_rate']
+        self.discount = discount
+        self.learning_rate = learning_rate
 
         # init necessary objects
-        self.dqn = MultipleActionDeepQNetwork(N, env, structure, "selected")
-        self.target_dqn = MultipleActionDeepQNetwork(N, env, structure, "target")
+        self.dqn = MultipleActionDeepQNetwork(env, structure, "selected")
+        self.target_dqn = MultipleActionDeepQNetwork(env, structure, "target")
 
         # create iteration counter
         self.counter_init = tf.zeros([], dtype=tf.int32)
@@ -58,7 +60,7 @@ class DDQNAgent(Agent):
         assert isinstance(policy, Policy)
         self.policy = policy
 
-    def action_graph(self, current_observations):
+    def action_graph(self, current_observation):
         """This method creates the action graph using the current observation. The policy
         has to be of type Policy.
 
@@ -68,10 +70,11 @@ class DDQNAgent(Agent):
         assert self.policy is not None
 
         # choose appropriate action
-        eval_graph = self.dqn.eval_graph(tf.expand_dims(current_observations, axis=1))
-        return self.policy.choose_action(eval_graph[:, 0, :])
+        eval_graph = self.dqn.eval_graph(tf.expand_dims(current_observation, 0))
+        return self.policy.choose_action(eval_graph[0])
 
     def observe_graph(self, current_observation, next_observation, action, reward, done):
+        assert self.memory is not None
 
         # create a clocked executor
         copy_weights_op = tfh.clocked_executor(
@@ -89,25 +92,14 @@ class DDQNAgent(Agent):
             current_q = self.dqn.eval_graph(current_states)
             next_q = self.dqn.eval_graph(next_states)
             target_next_q = self.target_dqn.eval_graph(next_states)
-            best_next_actions = tf.cast(tf.argmax(next_q, axis=2), tf.int32)
+            best_next_actions = tf.cast(tf.argmax(next_q, axis=1), tf.int32)
 
-            # create indices
-            A = tf.shape(actions)[1]
-            batch_rng = tf.expand_dims(tf.range(0, A, dtype=tf.int32), 0)
-            model_rng = tf.expand_dims(tf.range(0, self.N, dtype=tf.int32), 1)
+            sample_rng = tf.range(0, tf.size(actions), dtype=tf.int32)
+            indices_best_actions = tf.stack((sample_rng, best_next_actions), axis=1)
+            target_best_q_values = tf.gather_nd(target_next_q, indices_best_actions)
 
-            # scale to matrices
-            til_batch_rng = tf.tile(batch_rng, [self.N, 1])
-            til_model_rng = tf.tile(model_rng, [1, A])
-
-            # create index matrix
-            ind_best_actions_matrix = tf.stack([til_model_rng, til_batch_rng, best_next_actions], axis=2)
-            indices_best_actions = tf.reshape(ind_best_actions_matrix, [self.N * A, 3])
-            target_best_q_values = tf.reshape(tf.gather_nd(target_next_q, indices_best_actions), [self.N, A])
-
-            ind_actions_matrix = tf.stack([til_model_rng, til_batch_rng, actions], axis=2)
-            indices_actions = tf.reshape(ind_actions_matrix, [self.N * A, 3])
-            exec_q_values = tf.reshape(tf.gather_nd(current_q, indices_actions), [self.N, A])
+            indices_actions = tf.stack((sample_rng, actions), axis=1)
+            exec_q_values = tf.gather_nd(current_q, indices_actions)
 
             # calculate targets
             targets = rewards + tf.where(dones, tf.zeros_like(rewards), self.discount * target_best_q_values)

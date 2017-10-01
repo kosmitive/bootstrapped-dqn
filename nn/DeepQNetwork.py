@@ -9,5 +9,5 @@ class DeepQNetwork:
     def learn_graph(self, learning_rate, Q, target_actions):
         raise NotImplementedError()
 
-    def grid_graph(self, grid_dims):
+    def grid_graph(self, grid_dims, D):
         raise NotImplementedError()

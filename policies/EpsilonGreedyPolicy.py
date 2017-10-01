@@ -12,7 +12,7 @@ class EpsilonGreedyPolicy(Policy):
     epsilon cases it wil basically select a random one.
     """
 
-    def __init__(self, action_space, epsilon):
+    def __init__(self, N, action_space, epsilon):
         """Initializes a new EpsilonGreedyPolicy.
 
         Args:
@@ -20,7 +20,7 @@ class EpsilonGreedyPolicy(Policy):
             epsilon: The probability of choosing a random action.
         """
 
-        assert isinstance(action_space, Discrete)
+        super().__init__(N)
         self.action_space = action_space
         self.epsilon = epsilon
 
@@ -34,12 +34,12 @@ class EpsilonGreedyPolicy(Policy):
         """
 
         # get the number of states
-        best_action = GreedyPolicy().choose_action(q)
-        random_action = RandomPolicy().choose_action(self.action_space.n)
+        best_actions = GreedyPolicy(self.N).choose_action(q)
+        random_actions = RandomPolicy(self.N, self.action_space.dim()).choose_action(q)
 
         # combine both
-        random_decision_vector = tf.less(tf.random_uniform([1]), self.epsilon)
-        final_action = tf.where(random_decision_vector, best_action, random_action)
+        random_decision_vector = tf.less(tf.random_uniform([self.N]), self.epsilon)
+        final_actions = tf.where(random_decision_vector, best_actions, random_actions)
 
         # pass back the actions and corresponding q values
-        return final_action
+        return final_actions

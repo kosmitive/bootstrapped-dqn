@@ -2,8 +2,6 @@
 import tensorflow as tf
 
 from environments.Environment import Environment
-from gym.spaces import Box
-from gym.spaces import Discrete
 
 
 class MultipleActionDeepQNetwork:
@@ -11,7 +9,7 @@ class MultipleActionDeepQNetwork:
     common known structure of DQN and in addition, tries to output
     the Q function for each value at once."""
 
-    def __init__(self, env, structure, name_suffix):
+    def __init__(self, N, env, structure, name_suffix):
         """This constructs a new DeepQNetwork. It therefore constructs
         the corresponding layers of the network.
 
@@ -28,12 +26,10 @@ class MultipleActionDeepQNetwork:
             # obtain the spaces
             self.state_space = env.observation_space()
             self.action_space = env.action_space()
-
-            assert isinstance(self.state_space, Box)
-            assert isinstance(self.action_space, Discrete)
+            self.N = N
 
             # get tge action and state space sizes
-            state_size = self.state_space.shape[0]
+            state_size = self.state_space.dim()
             action_size = self.action_space.n
 
             # Build the graph
@@ -50,6 +46,7 @@ class MultipleActionDeepQNetwork:
         # for the ide only
         assert isinstance(network, MultipleActionDeepQNetwork)
         assert len(network.W) == len(self.W)
+        assert network.N == self.N
 
         # create operation list and fill accordingly
         ops = list()
@@ -75,17 +72,17 @@ class MultipleActionDeepQNetwork:
 
         """
 
-        assert states.shape[1] == self.state_space.shape[0]
+        assert states.shape[2] == self.state_space.dim()
 
         # set the start value
         Q = states
 
         # create network
         for i in range(len(self.W) - 1):
-            x = Q @ self.W[i] + self.b[i]
+            x = tf.einsum('nbi,nio->nbo', Q, self.W[i]) + self.b[i]
             Q = tf.maximum(x, 0.01 * x)
 
-        Q = Q @ self.W[-1]
+        Q = tf.einsum('nbi,nio->nbo', Q, self.W[-1])
 
         # pass back the relevant elements
         return Q
@@ -96,11 +93,11 @@ class MultipleActionDeepQNetwork:
         should be generated."""
 
         # calc x and y range
-        x_range = tf.range(self.state_space.low[0], self.state_space.high[0],
-                           (self.state_space.high[0] - self.state_space.low[0] - 0.0001) / (grid_dims[0] - 1), dtype=tf.float32)
+        x_range = tf.range(self.state_space.IB[0], self.state_space.IE[0],
+                           (self.state_space.IE[0] - self.state_space.IB[0] - 0.0001) / (grid_dims[0] - 1), dtype=tf.float32)
 
-        y_range = tf.range(self.state_space.low[1], self.state_space.high[1],
-                           (self.state_space.high[1] - self.state_space.low[1] - 0.0001) / (grid_dims[1] - 1), dtype=tf.float32)
+        y_range = tf.range(self.state_space.IB[1], self.state_space.IE[1],
+                           (self.state_space.IE[1] - self.state_space.IB[1] - 0.0001) / (grid_dims[1] - 1), dtype=tf.float32)
 
         # determine the width itself
         width = grid_dims[0] * grid_dims[1]
@@ -111,16 +108,16 @@ class MultipleActionDeepQNetwork:
         shaped_y_elements = tf.reshape(y_elements, [width])
 
         # concat them
-        all_elements = tf.stack([shaped_x_elements, shaped_y_elements], axis=1)
+        all_elements = tf.expand_dims(tf.stack([shaped_x_elements, shaped_y_elements], axis=1), axis=0)
 
         # evalute all of them
-        q = self.eval_graph(all_elements)
+        q = self.eval_graph(tf.tile(all_elements, [self.N, 1, 1]))
 
         # split them up
-        q_list = tf.unstack(q, axis=1)
+        q_list = tf.unstack(q, axis=2)
 
         # resize them again
-        grid_actions = [tf.reshape(q_list[i], [grid_dims[1], grid_dims[0]]) for i in range(len(q_list))]
+        grid_actions = [tf.reshape(q_list[i], [self.N, grid_dims[1], grid_dims[0]]) for i in range(len(q_list))]
 
         # and pass back
         return grid_actions
@@ -140,15 +137,17 @@ class MultipleActionDeepQNetwork:
         """
 
         # Define the error term
-        hl = 1.0
+        delta = 2.0
         error = Q - target_actions
         squared_error = 0.5 * tf.square(error)
         abs_error = tf.abs(error)
-        cond = abs_error < hl
-        loss = tf.where(cond, squared_error, hl * (abs_error - 0.5 * hl))
+        cond = tf.less(abs_error, delta)
+        huber_loss = tf.where(cond, squared_error, delta * (abs_error - 0.5 * delta))
 
         # Create a minimizer
-        minimizer = tf.train.RMSPropOptimizer(learning_rate).minimize(tf.reduce_mean(loss), var_list=self.W + self.b)
+        red_huber = tf.reduce_mean(huber_loss, axis=1)
+        reduced_loss = tf.reduce_sum(red_huber)
+        minimizer = tf.train.RMSPropOptimizer(learning_rate).minimize(reduced_loss, var_list=self.W + self.b)
 
         # pass back the relevant elements
         return minimizer
@@ -164,35 +163,31 @@ class MultipleActionDeepQNetwork:
 
         # create two lists
         W = list()
-        reg = tf.zeros([], dtype=tf.float32)
+        b = list()
+        reg = tf.zeros([self.N], dtype=tf.float32)
 
         in_size = structure[0]
         count = 0
 
         # create weights
-        for layer in structure[1:]:
+        for i in range(1, len(structure)):
+            layer = structure[i]
 
-            # create the weights
-            single_w = self.__init_single_weight_prelu([in_size, layer], ("W" + str(count)), 0.01)
+            # add weights
+            single_w = self.__init_single_weight_prelu([self.N, in_size, layer], ("W" + str(count)), 0.01)
+            unstacked_w = tf.unstack(single_w, axis=0)
+            W.append(single_w)
+            reg += tf.stack([tf.nn.l2_loss(v) for v in unstacked_w])
 
-            # add l2 loss
-            reg += tf.nn.l2_loss(single_w)
+            if i < len(structure) - 1:
+                # add b
+                single_b = self.__init_single_weight_with_init([self.N, 1, layer], ("b" + str(count)), tf.zeros_initializer())
+                unstacked_b = tf.unstack(single_b, axis=0)
+                reg += tf.stack([tf.nn.l2_loss(v) for v in unstacked_b])
+                b.append(single_b)
 
             # create weights and update control variables
-            W.append(single_w)
             in_size = layer
-            count = count + 1
-
-        # create biases
-        b = list()
-        count = 0
-
-        for layer in structure[1:-1]:
-
-            # create the bias
-            single_b = self.__init_single_weight_with_init([1, layer], ("b" + str(count)), tf.zeros_initializer())
-            reg += tf.nn.l2_loss(single_b)
-            b.append(single_b)
             count = count + 1
 
         return W, b, reg

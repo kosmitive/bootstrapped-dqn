@@ -13,7 +13,6 @@ from policies.EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from utils.DirectoryManager import DirectoryManager
 
 from scripts.configurations import ddqn_general_ddqn_eps_config
-from scripts.configurations import ddqn_general_ddqn_greedy_config
 from scripts.connector import build_general_configuration
 
 
@@ -21,21 +20,22 @@ from scripts.connector import build_general_configuration
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-batch = [["ddqn_eps_base", ddqn_general_ddqn_eps_config, "Epsilon-Greedy"],
-         ["ddqn_greedy_base", ddqn_general_ddqn_greedy_config, "Greedy"]]
+batch = [["ddqn_eps_base", ddqn_general_ddqn_eps_config, "Epsilon-Greedy"]]
 
 # the settings for the framework
-seed = 28
-epochs = 100000
-save_epoch = 500
+seed = 31
+epochs = 2500
+save_epoch = 100
 save_plot = True
-num_models = 50
+num_models = 1
+plot_as_variance = False
 
 # change display settings, note that these only apply
 # to the first model created internally.
-render = False
-plot_interactive = False
-grid_granularity = 300
+render = True
+plot_interactive = True
+grid_granularity = 500
+tf.set_random_seed(seed)
 
 # ---------------------------------------------------------------
 
@@ -56,50 +56,32 @@ for [agent_name, config, suffix] in batch:
     with graph.as_default():
         with tf.Session(graph=graph) as sess:
 
-            # each model gets saved in its own list entry
-            env_list = list()
-            agent_list = list()
-            feedback_list = list()
-            fill_step_list = list()
-            for m in range(num_models):
-                with tf.variable_scope("model_{}".format(m)):
-
-                    seed = seed + 1
-                    tf.set_random_seed(seed)
-                    [env, agent, memory, policy] = ddqn_general_ddqn_eps_config(name)
-                    feedback, fill_step = build_general_configuration(env, agent, memory, policy)
-                    env_list.append(env)
-                    agent_list.append(agent)
-                    feedback_list.append(feedback)
-                    fill_step_list.append(fill_step)
+            # create combined model
+            [env, agent, memory, policy] = ddqn_general_ddqn_eps_config(name, num_models)
+            feedback = build_general_configuration(env, agent, memory, policy)
 
             # init the graph
             init_op = tf.global_variables_initializer()
             sess.run(init_op)
 
-            # create commonly used dicts
-            eval_dict = {agent.learn: False for agent in agent_list}
-            train_dict = {agent.learn: True for agent in agent_list}
-
             # reset the environment
-            env_res_op = [env.reset_graph() for env in env_list]
+            env_res_op = env.reset_graph()
             sess.run(env_res_op)
 
             # obtain a grid for the q-function of the agent
-            q_functions = agent_list[0].dqn.grid_graph([grid_granularity, grid_granularity])
+            if save_plot or plot_interactive:
+                q_functions = agent.dqn.grid_graph([grid_granularity, grid_granularity])
 
             # Fill the replay memory
             print(line_size * "=")
             print("Filling Replay Memory...")
             print(line_size * "=")
-            i = sess.run(fill_step_list)[0]
-            while i > 0:
-                print(i)
-                i = sess.run(fill_step_list)[0]
+            vals = env.random_walk(memory.size)
+            sess.run(memory.fill_graph(*vals))
 
             # create the plot object
             if plot_interactive or save_plot:
-                rew_va_plt = RewardValueFunctionPlot(titlename, 3, env_list[0].env.observation_space)
+                rew_va_plt = RewardValueFunctionPlot(titlename, 3, env.observation_space())
             if plot_interactive:
                 rew_va_plt.interactive()
 
@@ -115,30 +97,32 @@ for [agent_name, config, suffix] in batch:
                 sess.run(env_res_op)
                 episode_finished = False
                 ep_start = time.time()
+                step_count = 0
 
                 # Repeat until the environment says it's done
                 while not episode_finished:
-                    feedback = sess.run(feedback_list, train_dict)
-                    rewards[:, epoch] += [el[2] for el in feedback]
+                    result = sess.run(feedback)
+                    step_count += 1
+                    rewards[:, epoch] += result[1]
 
                     # Generally the output stuff
-                    if render: env_list[0].render()
+                    if render: env.render(1)
 
                     # finish episode if necessary
-                    if feedback[0][1]:
+                    if any(result[2]):
                         ep_diff = round((time.time() - ep_start) * 1000, 2)
-                        print("\tEpisode {} took {} ms and finished with mean reward of {}".format(epoch, ep_diff, np.mean(rewards[:, epoch])))
+                        print("\tEpisode {} took {} ms and finished with {} steps and rewards {}".format(epoch, ep_diff, step_count, rewards[:, epoch]))
                         break
 
                 if plot_interactive or (save_plot and epoch % save_epoch == 0):
                     q_values = sess.run(q_functions)
-                    rew_va_plt.update(rewards[:, :epoch], q_values)
+                    rew_va_plt.update(rewards[:, :epoch+1], [q_value[0, :, :] for q_value in q_values], plot_as_variance)
 
                     if save_plot and epoch % save_epoch == 0:
                         dir_man.save_plot(rew_va_plt, epoch)
 
                 # save the rewards on each step
-                dir_man.save_rewards(rewards[:, :epoch])
+                dir_man.save_rewards(rewards[:, :epoch+1])
 
             tr_end = time.time()
             print(line_size * "=")
