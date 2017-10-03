@@ -172,5 +172,5 @@ class ExperienceReplayMemory(Memory):
         gathered_next_states = gather_and_split(self.next_states, all_indices)
 
         # pass back the sampled actions
-        return gathered_current_states, gathered_next_states, gathered_actions, gathered_rewards, tf.cast(gathered_dones, tf.bool)
+        return gathered_current_states, gathered_next_states, gathered_actions, gathered_rewards, gathered_dones
 

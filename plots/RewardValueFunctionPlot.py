@@ -24,6 +24,7 @@ class RewardValueFunctionPlot(Plot):
         # placeholders so that IDE does not
         # complain
         self.im_value_func = None
+        self.im_target_value_func = None
         self.im_actions = None
         self.plt_rewards = None
         self.box = [state_space.IB[0], state_space.IE[0], state_space.IB[1], state_space.IE[1]]
@@ -45,18 +46,22 @@ class RewardValueFunctionPlot(Plot):
 
         if self.initialized: return
 
-        self.fig = plt.figure(self.title, figsize=(13,9))
+        self.fig = plt.figure(self.title, figsize=(13,7))
         self.initialized = True
         margin = 0.08
-        half_ratio = 0.5 - 3 * margin / 2
+        half_ratio = (1.0 - 3 * margin) / 2
+        third_ratio = (1.0 - 4 * margin) / 3
 
         if show_v:
 
             # create figure and subplots accordingly
-            self.im_value_func = self.fig.add_axes([margin, margin, half_ratio, half_ratio])
+            self.im_value_func = self.fig.add_axes([margin, margin, third_ratio, half_ratio])
             self.im_value_func.set_title("V-Function")
 
-            self.im_actions = self.fig.add_axes([0.5 + margin / 2, margin, half_ratio, half_ratio])
+            self.im_target_value_func = self.fig.add_axes([2 * margin + third_ratio, margin, third_ratio, half_ratio])
+            self.im_target_value_func.set_title("Target V-Function")
+
+            self.im_actions = self.fig.add_axes([3 * margin + 2 * third_ratio, margin, third_ratio, half_ratio])
             self.im_actions.set_title("Q-Greedy")
 
             self.plt_rewards = self.fig.add_axes([margin, 0.5 + margin / 2, 1 - 2 * margin, half_ratio])
@@ -67,7 +72,7 @@ class RewardValueFunctionPlot(Plot):
             self.plt_rewards = self.fig.add_axes([margin, margin, 1 - 2 * margin, 1 - 2 * margin])
             self.plt_rewards.set_title("Rewards")
 
-    def update(self, rewards, q_funcs, plot_as_variance):
+    def update(self, rewards, q_funcs, t_q_funcs, plot_as_variance, obs_buffer):
         """This can be used to update the plot. It will prove whether
         the plot was already initialized.
 
@@ -124,8 +129,20 @@ class RewardValueFunctionPlot(Plot):
             vf = self.im_value_func.imshow(value_function, interpolation='nearest', extent=self.box, aspect='auto')
             self.im_value_func.set_ylabel("v")
             self.im_value_func.set_xlabel("x")
+            self.im_value_func.plot(obs_buffer[:,0], obs_buffer[:,1], color='black')
             plt.colorbar(vf, ax=self.im_value_func)
-        plt.pause(0.01)
+
+            # determine best actions and value function
+            t_stacked_q_funcs = np.stack(t_q_funcs, axis=2)
+            t_value_function = np.max(t_stacked_q_funcs, axis=2)
+
+            # fill the axes
+            vf2 = self.im_target_value_func.imshow(t_value_function, interpolation='nearest', extent=self.box, aspect='auto')
+            self.im_target_value_func.set_ylabel("v")
+            self.im_target_value_func.set_xlabel("x")
+            plt.colorbar(vf2, ax=self.im_target_value_func)
+
+        #plt.pause(0.01)
 
     def save(self, filename):
         self.fig.savefig(filename)

@@ -39,7 +39,7 @@ class EpsilonGreedyPolicy(Policy):
 
         # combine both
         random_decision_vector = tf.less(tf.random_uniform([self.N]), self.epsilon)
-        final_actions = tf.where(random_decision_vector, best_actions, random_actions)
+        final_actions = tf.where(random_decision_vector, random_actions, best_actions)
 
         # pass back the actions and corresponding q values
         return final_actions

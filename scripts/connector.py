@@ -18,10 +18,10 @@ def build_general_configuration(env, agent, memory, policy):
         action = agent.action_graph(current_observation)
 
         # execute action
-        next_observation, rewards, dones = env.step_graph(tf.Print(action, [action], "Action is "))
+        next_observation, rewards, dones = env.step_graph(action)
 
         # create the learn graph
-        if memory is not None: agent.register_memory(memory)
+        agent.register_memory(memory)
         minimizer = agent.observe_graph(current_observation, next_observation, action, rewards, dones)
 
         # execute the minimizer before "applying" the action

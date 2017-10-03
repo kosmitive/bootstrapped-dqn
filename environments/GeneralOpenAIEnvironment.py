@@ -65,9 +65,13 @@ class GeneralOpenAIEnvironment(Environment):
             step_rews = list()
             step_dones = list()
             for n in range(self.N):
-                sn_obs, sn_rew, sn_dn, _ = self.envs[n].step(step_actions[s, n])
+                sn_rew_c = 0
+                for d in range(4):
+                    sn_obs, sn_rew, sn_dn, _ = self.envs[n].step(step_actions[s, n])
+                    sn_rew_c += sn_rew
+
                 step_nobs.append(sn_obs)
-                step_rews.append(sn_rew)
+                step_rews.append(sn_rew_c)
                 step_dones.append(sn_dn)
                 if sn_dn: self.envs[n].reset()
 
@@ -140,12 +144,16 @@ class GeneralOpenAIEnvironment(Environment):
         rew_list = list()
         done_list = list()
 
-        # perform the steps at each environment
         for n in range(self.N):
-            observation, reward, done, info = self.envs[n].step(action[n])
+
+            rew = 0
+            # perform the steps at each environment
+            for d in range(4):
+                observation, reward, done, info = self.envs[n].step(action[n])
+                rew += reward
 
             obs_list.append(observation)
-            rew_list.append(reward)
+            rew_list.append(rew)
             done_list.append(done)
 
         # stack them all up

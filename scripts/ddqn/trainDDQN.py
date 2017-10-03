@@ -13,6 +13,7 @@ from policies.EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from utils.DirectoryManager import DirectoryManager
 
 from scripts.configurations import ddqn_general_ddqn_eps_config
+from scripts.configurations import ddqn_general_ddqn_greedy_config
 from scripts.connector import build_general_configuration
 
 
@@ -20,33 +21,40 @@ from scripts.connector import build_general_configuration
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-batch = [["ddqn_eps_base", ddqn_general_ddqn_eps_config, "Epsilon-Greedy"]]
+batch = [["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 13],
+         ["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 25],
+         ["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 38],
+         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 13],
+         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 25],
+         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 38]]
 
 # the settings for the framework
-seed = 31
-epochs = 2500
-save_epoch = 100
+epochs = 5000
+save_epoch = 10
 save_plot = True
 num_models = 1
 plot_as_variance = False
 
 # change display settings, note that these only apply
 # to the first model created internally.
-render = True
-plot_interactive = True
-grid_granularity = 500
-tf.set_random_seed(seed)
+render = False
+plot_interactive = False
+grid_granularity = 250
 
 # ---------------------------------------------------------------
 
-for [agent_name, config, suffix] in batch:
+for [agent_name, config, suffix, seed] in batch:
+
+    # set the seeds for this batch
+    tf.set_random_seed(seed)
+    np.random.seed(seed)
 
     titlename = "Double Deep-Q-Networks {}".format(suffix)
     line_size = 80
     print(line_size * "=")
 
     # first of all join the names
-    dir_man = DirectoryManager(run_folder, name, agent_name)
+    dir_man = DirectoryManager(run_folder, name, "{}_{}".format(agent_name, seed))
 
     # create the reward graph
     rewards = np.zeros((num_models, epochs))
@@ -57,7 +65,7 @@ for [agent_name, config, suffix] in batch:
         with tf.Session(graph=graph) as sess:
 
             # create combined model
-            [env, agent, memory, policy] = ddqn_general_ddqn_eps_config(name, num_models)
+            [env, agent, memory, policy, param] = config(name, num_models)
             feedback = build_general_configuration(env, agent, memory, policy)
 
             # init the graph
@@ -71,6 +79,7 @@ for [agent_name, config, suffix] in batch:
             # obtain a grid for the q-function of the agent
             if save_plot or plot_interactive:
                 q_functions = agent.dqn.grid_graph([grid_granularity, grid_granularity])
+                t_q_functions = agent.target_dqn.grid_graph([grid_granularity, grid_granularity])
 
             # Fill the replay memory
             print(line_size * "=")
@@ -94,29 +103,37 @@ for [agent_name, config, suffix] in batch:
             # Repeat for the number of epochs
             for epoch in range(epochs):
 
-                sess.run(env_res_op)
+                obs_buffer = np.empty([51, 2], dtype=np.float32)
+                obs_buffer[0, :] = sess.run(env_res_op)
                 episode_finished = False
                 ep_start = time.time()
                 step_count = 0
 
+                if epoch % 50 == 0:
+                    sess.run(agent.target_dqn.copy_graph(agent.dqn))
+
                 # Repeat until the environment says it's done
                 while not episode_finished:
-                    result = sess.run(feedback)
+                    [cobs, result] = sess.run([env.current_observation_graph(), feedback])
                     step_count += 1
                     rewards[:, epoch] += result[1]
+                    obs_buffer[step_count, :] = cobs
 
                     # Generally the output stuff
                     if render: env.render(1)
 
                     # finish episode if necessary
-                    if any(result[2]):
+                    if all(result[2]):
                         ep_diff = round((time.time() - ep_start) * 1000, 2)
-                        print("\tEpisode {} took {} ms and finished with {} steps and rewards {}".format(epoch, ep_diff, step_count, rewards[:, epoch]))
+                        eps = sess.run([param])
+                        print("\tEpisode {} took {} ms with {} steps and {} rewards using exploration of {}".format(epoch, ep_diff, step_count, rewards[:, epoch], eps))
                         break
 
                 if plot_interactive or (save_plot and epoch % save_epoch == 0):
-                    q_values = sess.run(q_functions)
-                    rew_va_plt.update(rewards[:, :epoch+1], [q_value[0, :, :] for q_value in q_values], plot_as_variance)
+                    [q_values, t_q_values] = sess.run([q_functions, t_q_functions])
+                    rew_va_plt.update(rewards[:, :epoch+1], [q_value[0, :, :] for q_value in q_values],
+                                      [t_q_value[0, :, :] for t_q_value in t_q_values],
+                                      plot_as_variance, obs_buffer)
 
                     if save_plot and epoch % save_epoch == 0:
                         dir_man.save_plot(rew_va_plt, epoch)

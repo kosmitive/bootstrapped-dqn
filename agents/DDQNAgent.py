@@ -80,38 +80,36 @@ class DDQNAgent(Agent):
             self.target_dqn.copy_graph(self.dqn)
         )
 
-        with tf.control_dependencies([copy_weights_op]):
+        # retrieve all samples
+        current_states, next_states, actions, rewards, dones = self.memory.store_and_sample_graph(current_observation, next_observation, action, reward, done)
 
-            # retrieve all samples
-            current_states, next_states, actions, rewards, dones = self.memory.store_and_sample_graph(current_observation, next_observation, action, reward, done)
+        # get both q functions
+        current_q = self.dqn.eval_graph(current_states)
+        next_q = self.dqn.eval_graph(next_states)
+        target_next_q = self.target_dqn.eval_graph(next_states)
+        best_next_actions = tf.cast(tf.argmax(next_q, axis=2), tf.int32)
 
-            # get both q functions
-            current_q = self.dqn.eval_graph(current_states)
-            next_q = self.dqn.eval_graph(next_states)
-            target_next_q = self.target_dqn.eval_graph(next_states)
-            best_next_actions = tf.cast(tf.argmax(next_q, axis=2), tf.int32)
+        # create indices
+        A = self.memory.sample_size
+        batch_rng = tf.expand_dims(tf.range(0, A, dtype=tf.int32), 0)
+        model_rng = tf.expand_dims(tf.range(0, self.N, dtype=tf.int32), 1)
 
-            # create indices
-            A = tf.shape(actions)[1]
-            batch_rng = tf.expand_dims(tf.range(0, A, dtype=tf.int32), 0)
-            model_rng = tf.expand_dims(tf.range(0, self.N, dtype=tf.int32), 1)
+        # scale to matrices
+        til_batch_rng = tf.tile(batch_rng, [self.N, 1])
+        til_model_rng = tf.tile(model_rng, [1, A])
 
-            # scale to matrices
-            til_batch_rng = tf.tile(batch_rng, [self.N, 1])
-            til_model_rng = tf.tile(model_rng, [1, A])
+        # create index matrix
+        ind_best_actions_matrix = tf.stack([til_model_rng, til_batch_rng, best_next_actions], axis=2)
+        indices_best_actions = tf.reshape(ind_best_actions_matrix, [self.N * A, 3])
+        target_best_q_values = tf.reshape(tf.gather_nd(target_next_q, indices_best_actions), [self.N, A])
 
-            # create index matrix
-            ind_best_actions_matrix = tf.stack([til_model_rng, til_batch_rng, best_next_actions], axis=2)
-            indices_best_actions = tf.reshape(ind_best_actions_matrix, [self.N * A, 3])
-            target_best_q_values = tf.reshape(tf.gather_nd(target_next_q, indices_best_actions), [self.N, A])
+        ind_actions_matrix = tf.stack([til_model_rng, til_batch_rng, actions], axis=2)
+        indices_actions = tf.reshape(ind_actions_matrix, [self.N * A, 3])
+        exec_q_values = tf.reshape(tf.gather_nd(current_q, indices_actions), [self.N, A])
 
-            ind_actions_matrix = tf.stack([til_model_rng, til_batch_rng, actions], axis=2)
-            indices_actions = tf.reshape(ind_actions_matrix, [self.N * A, 3])
-            exec_q_values = tf.reshape(tf.gather_nd(current_q, indices_actions), [self.N, A])
+        # calculate targets
+        targets = rewards + self.discount * tf.cast(1 - dones, tf.float32) * target_best_q_values
+        learn = self.dqn.learn_graph(self.learning_rate, exec_q_values, targets, self.global_step)
 
-            # calculate targets
-            targets = rewards + tf.where(dones, tf.zeros_like(rewards), self.discount * target_best_q_values)
-            learn = self.dqn.learn_graph(self.learning_rate, exec_q_values, targets)
-
-            # execute only if in learning mode
-            return learn
+        # execute only if in learning mode
+        return learn
