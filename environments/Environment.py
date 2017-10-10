@@ -1,9 +1,8 @@
 class Environment:
 
-    def __init__(self, name, N):
+    def __init__(self, name):
         """Creates a new Environment which keeps track of N states."""
         self.env_name = name
-        self.N = N
 
     def observation_space(self):
         """Only the space as an object."""

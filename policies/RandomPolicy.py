@@ -7,11 +7,10 @@ from gym.spaces import Discrete
 
 class RandomPolicy(Policy):
 
-    def __init__(self, N, max_num):
+    def __init__(self, max_num):
         """Inits a policy, therefore one has to supply a
         value for the times of dimensions"""
 
-        super().__init__(N)
         self.max = max_num
 
     def choose_action(self, q):
@@ -23,4 +22,4 @@ class RandomPolicy(Policy):
         Returns: The tensorflow graph
         """
 
-        return tf.random_uniform([self.N], maxval=self.max, dtype=tf.int32)
+        return tf.random_uniform([1], maxval=self.max, dtype=tf.int32)

@@ -10,7 +10,7 @@ class ExperienceReplayMemory(Memory):
     store the last N tuples.
     """
 
-    def __init__(self, N, size, sample_size, env):
+    def __init__(self, size, sample_size, env):
         """Constructs a new ReplayMemory.
 
         Args:
@@ -27,19 +27,18 @@ class ExperienceReplayMemory(Memory):
 
         # obtain the spaces
         state_space = env.observation_space()
-        action_space = env.action_space()
 
         # create a new variable scope
         with tf.variable_scope("replay_memory"):
 
             # init action and reward value
-            self.actions = tf.Variable(tf.zeros([size, N], dtype=tf.int32))
-            self.rewards = tf.Variable(tf.zeros([size, N], dtype=tf.float32))
-            self.dones = tf.Variable(tf.zeros([size, N], dtype=tf.int32))
+            self.actions = tf.Variable(tf.zeros([size], dtype=tf.int32))
+            self.rewards = tf.Variable(tf.zeros([size], dtype=tf.float32))
+            self.dones = tf.Variable(tf.zeros([size], dtype=tf.int32))
 
             # init state space size
             state_size = state_space.dim()
-            state_init = tf.zeros([size, N, state_size], dtype=tf.float32)
+            state_init = tf.zeros([size, state_size], dtype=tf.float32)
             self.current_states = tf.Variable(state_init)
             self.next_states = tf.Variable(state_init)
 
@@ -51,7 +50,6 @@ class ExperienceReplayMemory(Memory):
 
             # create necessary operations
             self.sample_size = sample_size
-            self.N = N
 
     # ---------------------- Memory Interface ---------------------------
 
@@ -73,61 +71,69 @@ class ExperienceReplayMemory(Memory):
     def reset_graph(self):
         """This method delivers the operation for resetting the
         replay memory."""
-        with tf.variable_scope("replay_memory"):
-            reset_count = tf.assign(self.count, self.counter_init)
-            reset_current = tf.assign(self.current, self.counter_init)
-            return tf.group(reset_count, reset_current)
 
-    def store_graph(self, current_states, next_states, actions, rewards, dones):
+        reset_count = tf.assign(self.count, self.counter_init)
+        reset_current = tf.assign(self.current, self.counter_init)
+        return tf.group(reset_count, reset_current)
+
+    def store_graph(self, current_state, next_state, action, reward, done):
         """This method inserts a new tuple into the replay memory.
 
         Args:
-            current_states: The current_state in a binary encoded fashion.
-            rewards: The reward for the action taken
-            actions: The action that was taken for the reward
-            next_states: The state after the action was executed.
-            dones: Whether the the episode was finished or not.
+            current_state: The current_state in a binary encoded fashion.
+            reward: The reward for the action taken
+            action: The action that was taken for the reward
+            next_state: The state after the action was executed.
+            done: Whether the the episode was finished or not.
         """
 
         # create a new variable scope
         with tf.variable_scope("replay_memory"):
 
             # insert values
+            exp_reward = tf.expand_dims(reward, 0)
             exp_current = tf.expand_dims(self.current, 0)
+            exp_current_state = tf.expand_dims(current_state, 0)
+            exp_next_state = tf.expand_dims(next_state, 0)
+            exp_done = tf.expand_dims(done, 0)
 
-            insert_action = tf.scatter_update(self.actions, exp_current, tf.expand_dims(actions, 0))
-            insert_reward = tf.scatter_update(self.rewards, exp_current, tf.expand_dims(rewards, 0))
-            insert_done = tf.scatter_update(self.dones, exp_current, tf.expand_dims(tf.cast(dones, tf.int32), 0))
-            insert_current_state = tf.scatter_update(self.current_states, exp_current, tf.expand_dims(current_states, 0))
-            insert_next_state = tf.scatter_update(self.next_states, exp_current, tf.expand_dims(next_states, 0))
+            insert_action = tf.scatter_update(self.actions, exp_current, action)
+            insert_reward = tf.scatter_update(self.rewards, exp_current, exp_reward)
+            insert_done = tf.scatter_update(self.dones, exp_current, exp_done)
+            insert_current_state = tf.scatter_update(self.current_states, exp_current, exp_current_state)
+            insert_next_state = tf.scatter_update(self.next_states, exp_current, exp_next_state)
 
             # create increase counters
             increase_current = tf.assign(self.current, tf.mod(self.current + 1, self.size))
-            increase_count = tf.cond(tf.less(self.count, self.size), lambda: tf.assign_add(self.count, 1), lambda: tf.assign(self.count, self.count))
+            increase_count = tf.cond(tf.less(self.count, self.size),
+                                     lambda: tf.assign_add(self.count, 1),
+                                     lambda: tf.assign(self.count, self.count))
 
             # pass back all operations melted together
-            insert_op = tf.group(insert_action, insert_reward, insert_current_state, insert_next_state, insert_done,
-                                 increase_current, increase_count)
+            insert_op = tf.group(insert_action, insert_reward,
+                                 insert_current_state, insert_next_state,
+                                 insert_done, increase_current, increase_count)
 
             with tf.control_dependencies([insert_op]):
                 return tf.identity(self.size - self.count)
 
-    def store_and_sample_graph(self, current_states, next_states, actions, rewards, dones):
+    def store_and_sample_graph(self, current_state, next_state, action, reward, done):
         """This method inserts a new tuple into the replay memory.
 
         Args:
-            current_states: The current_state in a binary encoded fashion.
-            rewards: The reward for the action taken
-            actions: The action that was taken for the reward
-            next_states: The state after the action was executed.
-            dones: Whether the the episode was finished or not.
+            current_state: The current_state in a binary encoded fashion.
+            reward: The reward for the action taken
+            action: The action that was taken for the reward
+            next_state: The state after the action was executed.
+            done: Whether the the episode was finished or not.
         """
 
-        insert_count = self.store_graph(current_states, next_states, actions, rewards, dones)
+        insert_count = self.store_graph(current_state, next_state, action, reward, done)
 
         # create a new variable scope
         with tf.variable_scope("replay_memory"):
-            with tf.control_dependencies([insert_count]):
+            insert_op = tf.group(insert_count)
+            with tf.control_dependencies([insert_op]):
                 samples = self.__create_samples(self.sample_size)
 
             return samples
@@ -141,35 +147,16 @@ class ExperienceReplayMemory(Memory):
             sample_size: How much samples should be derived.
         """
 
-        # create the indices for use with gather
-        ind_range = tf.range(0, self.count, dtype=tf.int32)
-        ind_list = list()
-
-        # iterate over
-        for n in range(self.N):
-
-            # get unique indices
-            permutation = tf.random_shuffle(ind_range)
-            first_indices = n * tf.ones([sample_size], dtype=tf.int32)
-            indices = permutation[:sample_size]
-            combined_ind = tf.stack([indices, first_indices], axis=1)
-            ind_list.append(combined_ind)
-
-        # obtain all indices
-        all_indices = tf.concat(ind_list, axis=0)
-
-        # simple function to reduce code size
-        def gather_and_split(tensor, g_indices):
-            gathered_values = tf.gather_nd(tensor, g_indices)
-            splitted_values = tf.split(gathered_values, num_or_size_splits=self.N, axis=0)
-            return tf.stack(splitted_values, axis=0)
+        # get unique indices
+        permutation = tf.random_shuffle(tf.range(0, self.count, dtype=tf.int32))
+        indices = permutation[:tf.minimum(sample_size, self.count)]
 
         # gather the values
-        gathered_actions = gather_and_split(self.actions, all_indices)
-        gathered_rewards = gather_and_split(self.rewards, all_indices)
-        gathered_dones = gather_and_split(self.dones, all_indices)
-        gathered_current_states = gather_and_split(self.current_states, all_indices)
-        gathered_next_states = gather_and_split(self.next_states, all_indices)
+        gathered_actions = tf.gather(self.actions, indices)
+        gathered_rewards = tf.gather(self.rewards, indices)
+        gathered_dones = tf.gather(self.dones, indices)
+        gathered_current_states = tf.gather(self.current_states, indices)
+        gathered_next_states = tf.gather(self.next_states, indices)
 
         # pass back the sampled actions
         return gathered_current_states, gathered_next_states, gathered_actions, gathered_rewards, gathered_dones

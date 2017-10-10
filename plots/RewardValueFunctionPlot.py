@@ -89,27 +89,8 @@ class RewardValueFunctionPlot(Plot):
 
         # and reininitialize
         self.initialize_figure(q_funcs is not None)
-        n = len(rewards)
+        self.plt_rewards.plot(rewards, label="M")
 
-        if plot_as_variance:
-
-            # start with plotting the reward
-            mean_reward = np.mean(rewards, axis=0)
-
-            # plot the confidence interval
-            l = np.size(rewards, 1)
-            if n > 1:
-                var_reward = np.var(rewards, axis=0)
-                var_offset = 1.96 * np.sqrt(var_reward / n)
-                var_top = mean_reward + var_offset
-                var_bottom = mean_reward - var_offset
-                self.plt_rewards.fill_between(np.arange(0,l), var_top, var_bottom, facecolor='#bbccf7')
-
-            self.plt_rewards.plot(mean_reward, color='#1241b7')
-
-        else:
-            for i in range(n):
-                self.plt_rewards.plot(rewards[i, :], label="M{}".format(i))
         self.plt_rewards.set_xlabel("t")
 
         if q_funcs is not None:
@@ -142,7 +123,7 @@ class RewardValueFunctionPlot(Plot):
             self.im_target_value_func.set_xlabel("x")
             plt.colorbar(vf2, ax=self.im_target_value_func)
 
-        #plt.pause(0.01)
+        if self.interactive: plt.pause(0.01)
 
     def save(self, filename):
         self.fig.savefig(filename)

@@ -4,12 +4,8 @@ import time
 import numpy as np
 import tensorflow as tf
 
+from manager.DirectoryManager import DirectoryManager
 from plots.RewardValueFunctionPlot import RewardValueFunctionPlot
-from utils.DirectoryManager import DirectoryManager
-
-from scripts.configurations import ddqn_general_ddqn_eps_config
-from scripts.configurations import ddqn_general_ddqn_greedy_config
-from scripts.connector import build_general_configuration
 from scripts import Workpackage
 
 

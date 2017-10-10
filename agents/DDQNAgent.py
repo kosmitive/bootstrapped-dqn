@@ -3,21 +3,18 @@ import tensorflow as tf
 
 import extensions.tensorflowHelpers as tfh
 from memory.Memory import Memory
-from nn.MultipleActionDeepQNetwork import MultipleActionDeepQNetwork
+from nn.DeepNetwork import DeepNetwork
 from policies.Policy import Policy
 from environments.Environment import Environment
 from agents.Agent import Agent
-from spaces.ContinuousSpace import ContinuousSpace
-from spaces.DiscreteSpace import DiscreteSpace
 
 class DDQNAgent(Agent):
     """this is the agent playing the game and trying to maximize the reward."""
 
-    def __init__(self, N, env, structure, config):
+    def __init__(self, env, structure, config):
         """Constructs a BootstrappedDDQNAgent.
 
         Args:
-            N: The number of independent agents
             env: The environment
             structure: Define the number of layers
             config:
@@ -35,20 +32,23 @@ class DDQNAgent(Agent):
         self.policy = None
         self.copy_offset = config['target_offset']
         self.iteration = 0
-        self.N = N
 
         # save these numbers
         self.discount = config['discount']
         self.learning_rate = config['learning_rate']
 
         # init necessary objects
-        self.dqn = MultipleActionDeepQNetwork(N, env, structure, "selected")
-        self.target_dqn = MultipleActionDeepQNetwork(N, env, structure, "target")
+        net_struct = [env.observation_space().dim()] + structure + [env.action_space().dim()]
+        self.network = DeepNetwork(net_struct, {"layer-norm" : True})
 
         # create iteration counter
         self.counter_init = tf.zeros([], dtype=tf.int32)
         self.iteration_counter = tf.Variable(0, trainable=False)
         self.global_step = tf.Variable(0, trainable=False)
+
+    def copy_graph(self):
+        self.network.switch('dqn')
+        return self.network.copy_graph('target')
 
     def register_memory(self, memory):
         assert isinstance(memory, Memory)
@@ -58,7 +58,7 @@ class DDQNAgent(Agent):
         assert isinstance(policy, Policy)
         self.policy = policy
 
-    def action_graph(self, current_observations):
+    def action_graph(self, current_observation):
         """This method creates the action graph using the current observation. The policy
         has to be of type Policy.
 
@@ -68,48 +68,37 @@ class DDQNAgent(Agent):
         assert self.policy is not None
 
         # choose appropriate action
-        eval_graph = self.dqn.eval_graph(tf.expand_dims(current_observations, axis=1))
-        return self.policy.choose_action(eval_graph[:, 0, :])
+        self.network.switch('dqn')
+        self.masks = self.network.get_mask_graph()
+        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0))
+        return self.policy.choose_action(eval_graph)
 
     def observe_graph(self, current_observation, next_observation, action, reward, done):
-
-        # create a clocked executor
-        copy_weights_op = tfh.clocked_executor(
-            self.iteration_counter,
-            self.copy_offset,
-            self.target_dqn.copy_graph(self.dqn)
-        )
+        assert self.memory is not None
 
         # retrieve all samples
         current_states, next_states, actions, rewards, dones = self.memory.store_and_sample_graph(current_observation, next_observation, action, reward, done)
 
         # get both q functions
-        current_q = self.dqn.eval_graph(current_states)
-        next_q = self.dqn.eval_graph(next_states)
-        target_next_q = self.target_dqn.eval_graph(next_states)
-        best_next_actions = tf.cast(tf.argmax(next_q, axis=2), tf.int32)
+        self.network.switch('dqn')
+        current_q = self.network.eval_graph(current_states, train=True)
+        next_q = self.network.eval_graph(next_states, train=True)
 
-        # create indices
-        A = self.memory.sample_size
-        batch_rng = tf.expand_dims(tf.range(0, A, dtype=tf.int32), 0)
-        model_rng = tf.expand_dims(tf.range(0, self.N, dtype=tf.int32), 1)
+        self.network.switch('target')
+        target_next_q = self.network.eval_graph(next_states)
+        best_next_actions = tf.cast(tf.argmax(next_q, axis=1), tf.int32)
 
-        # scale to matrices
-        til_batch_rng = tf.tile(batch_rng, [self.N, 1])
-        til_model_rng = tf.tile(model_rng, [1, A])
+        sample_rng = tf.range(0, tf.size(actions), dtype=tf.int32)
+        indices_best_actions = tf.stack((sample_rng, best_next_actions), axis=1)
+        target_best_q_values = tf.gather_nd(target_next_q, indices_best_actions)
 
-        # create index matrix
-        ind_best_actions_matrix = tf.stack([til_model_rng, til_batch_rng, best_next_actions], axis=2)
-        indices_best_actions = tf.reshape(ind_best_actions_matrix, [self.N * A, 3])
-        target_best_q_values = tf.reshape(tf.gather_nd(target_next_q, indices_best_actions), [self.N, A])
-
-        ind_actions_matrix = tf.stack([til_model_rng, til_batch_rng, actions], axis=2)
-        indices_actions = tf.reshape(ind_actions_matrix, [self.N * A, 3])
-        exec_q_values = tf.reshape(tf.gather_nd(current_q, indices_actions), [self.N, A])
+        indices_actions = tf.stack((sample_rng, actions), axis=1)
+        exec_q_values = tf.gather_nd(current_q, indices_actions)
 
         # calculate targets
         targets = rewards + self.discount * tf.cast(1 - dones, tf.float32) * target_best_q_values
-        learn = self.dqn.learn_graph(self.learning_rate, exec_q_values, targets, self.global_step)
+        self.network.switch('dqn')
+        learn = self.network.learn_graph(self.learning_rate, exec_q_values, tf.stop_gradient(targets), self.global_step)
 
         # execute only if in learning mode
         return learn

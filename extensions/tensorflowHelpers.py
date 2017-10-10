@@ -32,3 +32,9 @@ def exp_decay(exp_max, exp_min, decay_lambda, step):
     return exp_min \
           + (exp_max - exp_min) \
             * tf.exp(-decay_lambda * tf.cast(step, tf.float32))
+
+def linear_decay(schedule_timesteps, initial_p, final_p, step):
+
+    # create linear decay learning rate
+    fraction = tf.minimum(step / schedule_timesteps, 1.0)
+    return initial_p + fraction * (final_p - initial_p)

@@ -8,24 +8,23 @@ from policies.RandomPolicy import RandomPolicy
 
 def build_general_configuration(env, agent, memory, policy):
 
-    with tf.variable_scope("main_graph"):
+    # build the final graph
+    current_observation = env.current_observation_graph()
 
-        # build the final graph
-        current_observation = env.current_observation_graph()
+    # obtain basically the best action
+    agent.register_policy(policy)
+    sample = agent.network.create_mask_graph(0.85)
+    action = agent.action_graph(current_observation)
 
-        # obtain basically the best action
-        agent.register_policy(policy)
-        action = agent.action_graph(current_observation)
+    # execute action
+    next_observation, rewards, dones = env.step_graph(action)
 
-        # execute action
-        next_observation, rewards, dones = env.step_graph(action)
+    # create the learn graph
+    agent.register_memory(memory)
+    minimizer = agent.observe_graph(current_observation, next_observation, action, rewards, dones)
 
-        # create the learn graph
-        agent.register_memory(memory)
-        minimizer = agent.observe_graph(current_observation, next_observation, action, rewards, dones)
-
-        # execute the minimizer before "applying" the action
-        with tf.control_dependencies([minimizer]):
-            one_step = env.apply_step_graph()
-
-    return one_step, rewards, dones
+    # execute the minimizer before "applying" the action
+    with tf.control_dependencies([minimizer]):
+        one_step = env.apply_step_graph()
+    feedback = one_step, rewards, dones
+    return feedback, sample

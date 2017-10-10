@@ -2,11 +2,6 @@ class Policy:
     """Represents a basic policies_nn. It therefore needs a function, which
     evaluates successfully the q function"""
 
-    def __init__(self, N):
-        """Inits a policy, therefore one has to supply a
-        value for the times of dimensions"""
-
-        self.N = N
 
     def choose_action(self, q):
         """This method of a policies_nn basically gets a Q function

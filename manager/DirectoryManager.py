@@ -11,14 +11,19 @@ class DirectoryManager:
         if not path.exists(self.root):
             makedirs(self.root)
 
-    def save_plot(self, plot, epoch):
+    def save_plot(self, plot, epoch, name = None):
         assert isinstance(plot, Plot)
 
-        folder = path.join(self.root, plot.name())
+        if name is None:
+            folder = path.join(self.root, plot.name())
+            filename = path.join(folder, "plt_{}.eps".format(epoch))
+        else:
+            folder = self.root
+            filename = path.join(folder, name)
+
         if not path.exists(folder):
             makedirs(folder)
 
-        filename = path.join(folder, "plt_{}.eps".format(epoch))
         plot.save(filename)
 
     def save_rewards(self, rewards):
