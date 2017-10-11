@@ -70,7 +70,7 @@ class DDQNAgent(Agent):
         # choose appropriate action
         self.network.switch('dqn')
         self.masks = self.network.get_mask_graph()
-        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0))
+        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0), zoneout_masks=self.masks)
         return self.policy.choose_action(eval_graph)
 
     def observe_graph(self, current_observation, next_observation, action, reward, done):
@@ -81,11 +81,11 @@ class DDQNAgent(Agent):
 
         # get both q functions
         self.network.switch('dqn')
-        current_q = self.network.eval_graph(current_states, train=True)
-        next_q = self.network.eval_graph(next_states, train=True)
+        current_q = self.network.eval_graph(current_states, train=True, zoneout_masks=self.masks)
+        next_q = self.network.eval_graph(next_states, train=True, zoneout_masks=self.masks)
 
         self.network.switch('target')
-        target_next_q = self.network.eval_graph(next_states)
+        target_next_q = self.network.eval_graph(next_states, zoneout_masks=self.masks)
         best_next_actions = tf.cast(tf.argmax(next_q, axis=1), tf.int32)
 
         sample_rng = tf.range(0, tf.size(actions), dtype=tf.int32)

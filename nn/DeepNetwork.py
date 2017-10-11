@@ -202,7 +202,7 @@ class DeepNetwork:
             reg += tf.nn.l2_loss(v)
 
         # Create a minimizer
-        optimizer = tf.train.AdamOptimizer(learning_rate)
+        optimizer = tf.train.RMSPropOptimizer(learning_rate)
         gradients = optimizer.compute_gradients(loss, var_list=self.log[self.scope])
         for i, (grad, var) in enumerate(gradients):
             if grad is not None:

@@ -1,4 +1,5 @@
 import tensorflow as tf
+import extensions.tensorflowHelpers as tfh
 
 from agents.Agent import Agent
 from memory.Memory import Memory
@@ -13,7 +14,9 @@ def build_general_configuration(env, agent, memory, policy):
 
     # obtain basically the best action
     agent.register_policy(policy)
-    sample = agent.network.create_mask_graph(0.85)
+
+    value = 0.95 + (0.05 - tfh.linear_decay(1000, 0.05, 0.0, agent.global_step))
+    sample = agent.network.create_mask_graph(value)
     action = agent.action_graph(current_observation)
 
     # execute action

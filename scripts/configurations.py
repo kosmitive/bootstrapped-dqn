@@ -10,15 +10,15 @@ import tensorflow as tf
 def ddqn_general_ddqn_eps_config(env_name, max_timesteps):
 
         # Replay memory
-        replay_size = 100000
+        replay_size = 30000
         sample_size = 128
 
         # DQN
-        structure = [256, 256]
+        structure = [256,256]
         agent_config = {
                 'discount': 0.99,
-                'learning_rate': 0.00025,
-                'target_offset': 2000,
+                'learning_rate': 0.00075,
+                'target_offset': 500,
         }
 
         # Exploration reduction
@@ -34,8 +34,8 @@ def ddqn_general_ddqn_eps_config(env_name, max_timesteps):
         exploration_parameter = tfh.exp_decay(exp_rate_begin, exp_rate_end, decay_lambda, agent.global_step)
         exploration_parameter = tfh.linear_decay(int(decay_lambda * 100000),
                                                  exp_rate_begin, exp_rate_end, agent.global_step)
-        exploration_strategy = EpsilonGreedyPolicy(env.action_space(), exploration_parameter)
-        # exploration_strategy = GreedyPolicy()
+        #exploration_strategy = EpsilonGreedyPolicy(env.action_space(), exploration_parameter)
+        exploration_strategy = GreedyPolicy()
         return [env, agent, memory, exploration_strategy, exploration_parameter], agent_config
 
 

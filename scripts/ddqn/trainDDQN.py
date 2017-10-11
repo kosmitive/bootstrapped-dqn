@@ -32,8 +32,8 @@ num_cpu = 16
 seed = 12
 # change display settings, note that these only apply
 # to the first model created internally.
-render = False
-plot_interactive = False
+render = True
+plot_interactive = True
 grid_granularity = 300
 best_reward = -300
 # ---------------------------------------------------------------
@@ -81,7 +81,7 @@ for [agent_name, config, suffix, seed] in batch:
                 sess.run(env_res_op)
 
                 # obtain a grid for the q-function of the agent
-                if save_best or save_plot or plot_interactive and is2d:
+                if (save_best or save_plot or plot_interactive) and is2d:
                     agent.network.switch('dqn')
                     q_functions = agent.network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
                     agent.network.switch('target')
@@ -119,7 +119,7 @@ for [agent_name, config, suffix, seed] in batch:
                     step_count = 0
                     gs = sess.run(agent.global_step)
 
-                    if plot_interactive or (save_plot and epoch % save_epoch == 0) or (save_best and rewards[epoch] > best_reward) and is2d:
+                    if (plot_interactive or (save_plot and epoch % save_epoch == 0) or (save_best and rewards[epoch] > best_reward)) and is2d:
                             [q_values, t_q_values] = sess.run([q_functions, t_q_functions])
 
                     # Repeat until the environment says it's done
