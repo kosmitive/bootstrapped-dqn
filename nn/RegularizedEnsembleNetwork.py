@@ -30,12 +30,16 @@ from nn.FiniteEnsembleNetwork import FiniteEnsembleNetwork
 class RegularizedEnsembleNetwork(FiniteEnsembleNetwork):
     """This represents a RegularizedEnsembleNetwork."""
 
-    def __init__(self, K, D, H, structure, config):
+    def __init__(self, K, D, H, structure, theta, config):
         """This constructs a new RegularizedEnsembleNetwork. The structure of the whole network
         is given however different masks are sampled such that
 
         Args:
+            K: The number of heads
+            D: The number of heads per decision
+            H: The number of heads for learning
             structure: The structure for the hidden layers, a list of integers.
+            theta: The probability of sampling a one.
             config:
                 layer_norm: Activate Layer Normalization
                 activation_fn: Define the activation_fn as lambda tf.Tensor: -> tf.Tensor
@@ -53,6 +57,13 @@ class RegularizedEnsembleNetwork(FiniteEnsembleNetwork):
         self.structure = structure
         super().__init__(K, D, H, config)
 
+        # sample the masks
+        self.masks = list()
+        for l in range(int(config['mask_type'] is 'zoneout'), len(structure)):
+            random_mask = tf.distributions.Bernoulli(probs=theta)
+            random_mask_var = tf.Variable(random_mask.sample([structure[l], K]), trainable=False)
+            self.masks.append(random_mask_var)
+
     # --- Graphs ---
 
     def eval_heads_graph(self, x, scope):
@@ -65,9 +76,14 @@ class RegularizedEnsembleNetwork(FiniteEnsembleNetwork):
         Returns:
             A list of evaluated heads
         """
+        heads = list()
         with tf.variable_scope(scope, reuse=(scope in self.log)):
-            Q = self._eval_fc_network(x, self.structure, regression_layer=True)
+            for k in range(self.K):
+                k_masks = [mask[:, k] for mask in self.masks]
+                head = self._eval_fc_network(x, self.structure, regression_layer=True, masks=k_masks)
+                heads.append(head)
 
+            heads = tf.stack(heads, axis=1)
         self._collect_scope_vars(scope)
-        return Q
+        return heads
 
