@@ -74,7 +74,7 @@ class DeepNetwork:
         return self.masks
 
 
-    def eval_graph(self, input, dropout_masks = None, zoneout_masks = None, layer_norm=True, train=False):
+    def eval_graph(self, input, dropout_masks = None, zoneout_masks = None, shakeout_masks = None, layer_norm=True, train=False, seed=17):
         """This creates the graph it therefore receives the input tensor and
         of course the weights for each layer.
 
@@ -89,24 +89,28 @@ class DeepNetwork:
         assert input.shape[1] == self.structure[0]
         assert self.scope is not None
         debug = False
-        seed = 17
 
         with tf.variable_scope(self.scope, reuse=(self.scope in self.log)):
 
             Q = input
             for hidden_num in range(1, len(self.structure) - 1):
                 hidden = self.structure[hidden_num]
-                x = layers.fully_connected(Q, num_outputs=hidden, activation_fn=None,
-                                           #weights_regularizer=layers.l2_regularizer(0.05),
-                                           #biases_regularizer=layers.l2_regularizer(0.05),
-                                           weights_initializer=
-                                               layers.variance_scaling_initializer(
+                W = tf.get_variable("W_{}".format(hidden_num), shape=[self.structure[hidden_num - 1], hidden],
+                                    initializer=layers.variance_scaling_initializer(
                                                    factor=2.0/(1+0.1**2),
                                                    mode='FAN_IN',
-                                                   seed=seed * hidden_num,
+                                                   #seed=seed * hidden_num,
                                                    uniform=False,
                                                    dtype=tf.float32)
                                                )
+                b = tf.get_variable("b_{}".format(hidden_num), shape=[1, hidden],
+                                    initializer=tf.zeros_initializer())
+
+                if shakeout_masks is None:
+                    x = Q @ W + b
+                else:
+                    q = 0.3
+                    x = Q @ (W @ shakeout_masks[hidden_num - 1] + q * tf.sign(W) @ shakeout_masks[hidden_num - 1] - 1) + b
 
                 if layer_norm: x = layers.layer_norm(x, center=True, scale=True)
                 if dropout_masks is not None: x = tf.expand_dims(dropout_masks[hidden_num - 1], 0) * x
@@ -123,7 +127,7 @@ class DeepNetwork:
                                                layers.variance_scaling_initializer(
                                                    factor=2.0/(1+0.05**2),
                                                    mode='FAN_IN',
-                                                   seed=seed * hidden_num,
+                                                   #seed=seed * hidden_num,
                                                    uniform=False,
                                                    dtype=tf.float32)
                                                )

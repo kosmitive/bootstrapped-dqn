@@ -38,3 +38,12 @@ def linear_decay(schedule_timesteps, initial_p, final_p, step):
     # create linear decay learning rate
     fraction = tf.minimum(step / schedule_timesteps, 1.0)
     return initial_p + fraction * (final_p - initial_p)
+
+def duplicate_each_element(vector: tf.Tensor, repeat: int):
+    """This method takes a vector and duplicates each element the number of times supplied."""
+
+    height = tf.shape(vector)[0]
+    exp_vector = tf.expand_dims(vector, 1)
+    tiled_states = tf.tile(exp_vector, [1, repeat])
+    mod_vector = tf.reshape(tiled_states, [repeat * height])
+    return mod_vector

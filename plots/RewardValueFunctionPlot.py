@@ -89,8 +89,13 @@ class RewardValueFunctionPlot(Plot):
 
         # and reininitialize
         self.initialize_figure(q_funcs is not None)
-        self.plt_rewards.plot(rewards, label="M")
 
+        mean_reward = np.mean(rewards, axis=0)
+        var_reward = np.var(rewards, axis=0)
+        offset = 1.96 * np.sqrt(var_reward / len(rewards))
+
+        self.plt_rewards.plot(mean_reward, label="M", color="#215ab7")
+        self.plt_rewards.fill_between(np.arange(len(mean_reward)), mean_reward - offset, mean_reward + offset, facecolor="#215ab786")
         self.plt_rewards.set_xlabel("t")
 
         if q_funcs is not None:

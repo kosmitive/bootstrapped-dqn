@@ -2,6 +2,7 @@ import gym
 import numpy as np
 import tensorflow as tf
 
+from gym.envs.classic_control.mountain_car import MountainCarEnv
 from gym.spaces import Box
 from gym.spaces import Discrete
 from environments.Environment import Environment
@@ -10,7 +11,7 @@ from spaces.DiscreteSpace import DiscreteSpace
 
 class GeneralOpenAIEnvironment(Environment):
 
-    def __init__(self, env_name):
+    def __init__(self, env_name, num_models):
         """Constructs a new general environment with a specified name. In detail one can
         create multiple environments, which are all capable of retaining their own state.
 
@@ -36,12 +37,15 @@ class GeneralOpenAIEnvironment(Environment):
                                        self.env.observation_space.low,
                                        self.env.observation_space.high)
         self.a_space = DiscreteSpace(self.env.action_space.n)
+        self.num_models = num_models
+        self.real_dones = num_models * [False]
 
         # save the observation space
         with tf.variable_scope(self.env_name):
+            self.envs = [gym.make(env_name) for _ in range(num_models)]
 
             # create pointer for the observation space itself
-            init = tf.zeros([self.o_space.dim()], dtype=tf.float32)
+            init = tf.zeros([num_models, self.o_space.dim()], dtype=tf.float32)
             self.current_observation = tf.Variable(init, trainable=False)
             self.next_observations = None
 
@@ -92,18 +96,18 @@ class GeneralOpenAIEnvironment(Environment):
     def step_graph(self, actions):
         """This method receives a vector of N actions."""
         with tf.variable_scope(self.env_name):
-            next_observations, rewards, dones = tf.py_func(self.__one_step, [tf.cast(actions, tf.int64)], [tf.float64, tf.float64, tf.bool])
+            next_observations, rewards, dones, stdone = tf.py_func(self.__one_step, [tf.cast(actions, tf.int64)], [tf.float64, tf.float64, tf.bool, tf.bool])
             self.next_observations = tf.cast(next_observations, tf.float32)
-            return self.next_observations, tf.cast(rewards, tf.float32),  tf.cast(dones, tf.int32)
+            return self.next_observations, tf.cast(rewards, tf.float32),  tf.cast(dones, tf.int32),  tf.cast(stdone, tf.int32)
 
     def apply_step_graph(self):
         with tf.variable_scope(self.env_name):
             return tf.assign(self.current_observation, self.next_observations)
 
-    def render(self):
+    def render(self, D):
         """Render the first D environments."""
 
-        self.env.render()
+        self.envs[0].render()
 
     def reset_graph(self):
         """This method simply executed the reset function for each environment"""
@@ -111,14 +115,31 @@ class GeneralOpenAIEnvironment(Environment):
         with tf.variable_scope(self.env_name):
 
             # map over all observations
-            observation = tf.py_func(self.env.reset, [], tf.float64)
+            observation = tf.py_func(self.__reset_envs, [], tf.float64)
 
             # afterwards group them in one operation
             return tf.assign(self.current_observation, tf.cast(observation, tf.float32))
 
     # ---------------------- Private Functions ---------------------------
 
+    def __reset_envs(self):
+        val =np.stack([self.envs[k].reset() for k in range(self.num_models)], axis=0)
+        self.real_dones = self.num_models * [False]
+        return val
+
     def __one_step(self, action):
 
-        observation, reward, done, info = self.env.step(action[0])
-        return observation, reward, done
+        observations = list()
+        rewards = list()
+        dones = list()
+        stop_train_done = list()
+
+        for k in range(self.num_models):
+            observation, reward, done, _ = self.envs[k].step(action[k][0])
+            observations.append(observation)
+            rewards.append(reward)
+            dones.append(done)
+            stop_train_done.append(done and self.real_dones[k])
+            self.real_dones[k] = done
+
+        return np.stack(observations, 0), np.stack(rewards, 0), np.stack(dones, 0), np.stack(stop_train_done, 0)

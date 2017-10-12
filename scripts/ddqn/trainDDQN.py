@@ -14,28 +14,28 @@ from scripts.connector import build_general_configuration
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-batch = [["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 15],
-         ["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 25],
-         ["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 38],
-         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 13],
-         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 25],
-         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 38]]
+batch = [["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 35],
+         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 36]]
 
 # the settings for the framework
-epochs = 500000
-save_epoch = 50
+epochs = 2500
+
+save_epoch = 100
 save_plot = True
 save_best = True
-num_models = 1
+num_models = 5
+
 plot_as_variance = False
 num_cpu = 16
 seed = 12
+
 # change display settings, note that these only apply
 # to the first model created internally.
-render = True
-plot_interactive = True
-grid_granularity = 300
+render = False
+plot_interactive = False
+grid_granularity = 500
 best_reward = -300
+
 # ---------------------------------------------------------------
 
 for [agent_name, config, suffix, seed] in batch:
@@ -52,12 +52,16 @@ for [agent_name, config, suffix, seed] in batch:
     dir_man = DirectoryManager(run_folder, name, "{}_{}".format(agent_name, seed))
 
     # create the reward graph
-    rewards = np.zeros((epochs))
+    rewards = np.zeros((num_models, epochs))
 
     # create new graph and session, respectively
     graph = tf.Graph()
     with graph.as_default():
-        tf_config = tf.ConfigProto(log_device_placement=True)
+        tf_config = tf.ConfigProto(
+            log_device_placement=True,
+            inter_op_parallelism_threads=16,
+            intra_op_parallelism_threads=16)
+
         tf_config.gpu_options.allow_growth=True
         with tf.Session(graph=graph, config=tf_config) as sess:
             with tf.variable_scope("main"):
@@ -65,11 +69,11 @@ for [agent_name, config, suffix, seed] in batch:
                 np.random.seed(seed + 1)
 
                 # create combined model
-                [env, agent, memory, policy, param], conf = config(name, epochs * 200)
-                feedback, sample_mask = build_general_configuration(env, agent, memory, policy)
+                [env, agents, memories, policies, params], conf = config(name, epochs * 200, num_models)
+                feedback = build_general_configuration(env, agents, memories, policies)
 
                 # get copy graph
-                copy = agent.copy_graph()
+                copy = [agents[k].copy_graph() for k in range(num_models)]
                 is2d = env.observation_space().dim() == 2
 
                 # init the graph
@@ -82,17 +86,19 @@ for [agent_name, config, suffix, seed] in batch:
 
                 # obtain a grid for the q-function of the agent
                 if (save_best or save_plot or plot_interactive) and is2d:
-                    agent.network.switch('dqn')
-                    q_functions = agent.network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
-                    agent.network.switch('target')
-                    t_q_functions = agent.network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
+                    with tf.variable_scope("0"):
+                        agents[0].network.switch('dqn')
+                        q_functions = agents[0].network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
+                        agents[0].network.switch('target')
+                        t_q_functions = agents[0].network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
 
                 # Fill the replay memory
                 print(line_size * "=")
                 print("Filling Replay Memory...")
                 print(line_size * "=")
-                vals = env.random_walk(memory.size)
-                sess.run(memory.fill_graph(*vals))
+                for memory in memories:
+                    vals = env.random_walk(memory.size)
+                    sess.run(memory.fill_graph(*vals))
 
                 # create the plot object
                 if plot_interactive or save_plot or save_best:
@@ -108,51 +114,61 @@ for [agent_name, config, suffix, seed] in batch:
 
                 # Repeat for the number of epochs
                 for epoch in range(epochs):
-                    res, _ = sess.run([env_res_op, sample_mask])
+                    res = sess.run(env_res_op)
 
                     if is2d:
                         obs_buffer = np.empty([201, 2], dtype=np.float32)
-                        obs_buffer[0, :] = res
+                        obs_buffer[0, :] = res[0, :]
 
                     episode_finished = False
                     ep_start = time.time()
                     step_count = 0
-                    gs = sess.run(agent.global_step)
+                    gs = sess.run([agents[k].global_step for k in range(num_models)])
+                    pers_dones = num_models * [False]
 
-                    if (plot_interactive or (save_plot and epoch % save_epoch == 0) or (save_best and rewards[epoch] > best_reward)) and is2d:
+                    if (plot_interactive or (save_plot and epoch % save_epoch == 0) or (save_best and np.mean(rewards, 0)[epoch] > best_reward)) and is2d:
                             [q_values, t_q_values] = sess.run([q_functions, t_q_functions])
 
                     # Repeat until the environment says it's done
                     while not episode_finished:
-                        if gs % conf['target_offset'] == 0: sess.run(copy)
-                        gs += 1
+
+                        # copy the models which reached the target offset
+                        copy_models = list()
+                        for k in range(num_models):
+                            if gs[k] % conf['target_offset'] == 0:
+                                copy_models.append(copy[k])
+                            gs[k] += 1
+                        sess.run(copy_models)
+
                         cobs, result = sess.run([env.current_observation_graph(), feedback])
                         step_count += 1
-                        rewards[epoch] += result[1]
+                        for k in range(num_models):
+                            if not pers_dones[k]: rewards[k, epoch] += result[1][k]
+                            pers_dones[k] = result[2][k]
 
                         if is2d:
-                            obs_buffer[step_count, :] = cobs
+                            obs_buffer[step_count, :] = cobs[0, :]
 
                         # Generally the output stuff
-                        if render: env.render()
+                        if render: env.render(1)
 
                         # finish episode if necessary
-                        if result[2]:
+                        if all(result[2]):
                             ep_diff = round((time.time() - ep_start) * 1000, 2)
-                            eps = sess.run([param])
-                            print("\tEpisode {} took {} ms with {} steps and {} rewards using exploration of {}".format(epoch, ep_diff, step_count, rewards[epoch], eps))
+                            eps = sess.run([params[0]])
+                            print("\tEpisode {} took {} ms with {} steps and {} rewards using exploration of {}".format(epoch, ep_diff, step_count, np.mean(rewards, 0)[epoch], eps))
                             break
 
-                    if plot_interactive or (save_plot and epoch % save_epoch == 0) or (save_best and rewards[epoch] > best_reward):
+                    if plot_interactive or (save_plot and epoch % save_epoch == 0) or (save_best and np.mean(rewards, 0)[epoch] > best_reward):
                         if is2d:
-                            rew_va_plt.update(rewards[:epoch+1], [q_value[:, :] for q_value in q_values],
+                            rew_va_plt.update(rewards[:, :epoch+1], [q_value[:, :] for q_value in q_values],
                                              [t_q_value[:, :] for t_q_value in t_q_values],
                                               plot_as_variance, obs_buffer[:step_count+1])
                         else:
-                            rew_va_plt.update(rewards[:epoch+1], None, None, plot_as_variance, None)
+                            rew_va_plt.update(rewards[:, :epoch+1], None, None, plot_as_variance, None)
 
-                        if save_best and rewards[epoch] > best_reward:
-                            best_reward = rewards[epoch]
+                        if save_best and np.mean(rewards, 0)[epoch] > best_reward:
+                            best_reward = np.mean(rewards, 0)[epoch]
                             dir_man.save_plot(rew_va_plt, epoch, "best_rew_va.eps")
 
                         if save_plot and epoch % save_epoch == 0:
@@ -163,6 +179,7 @@ for [agent_name, config, suffix, seed] in batch:
                 print("Training took {} ms".format(tr_end - tr_start))
 
                 # save the rewards on each step
+                dir_man.save_plot(rew_va_plt, epochs)
                 dir_man.save_rewards(rewards)
 
     if plot_interactive: rew_va_plt.show()
