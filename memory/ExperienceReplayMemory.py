@@ -5,6 +5,7 @@ from memory.Memory import Memory
 from spaces.ContinuousSpace import ContinuousSpace
 from spaces.DiscreteSpace import DiscreteSpace
 
+
 class ExperienceReplayMemory(Memory):
     """This class represent a basic replay memory. It can basically
     store the last N tuples.
@@ -24,6 +25,7 @@ class ExperienceReplayMemory(Memory):
         assert size > 0
         assert sample_size <= size
         assert isinstance(env, Environment)
+        super().__init__(sample_size)
 
         # obtain the spaces
         state_space = env.observation_space()
@@ -117,30 +119,9 @@ class ExperienceReplayMemory(Memory):
             with tf.control_dependencies([insert_op]):
                 return tf.identity(self.size - self.count)
 
-    def store_and_sample_graph(self, current_state, next_state, action, reward, done):
-        """This method inserts a new tuple into the replay memory.
-
-        Args:
-            current_state: The current_state in a binary encoded fashion.
-            reward: The reward for the action taken
-            action: The action that was taken for the reward
-            next_state: The state after the action was executed.
-            done: Whether the the episode was finished or not.
-        """
-
-        insert_count = self.store_graph(current_state, next_state, action, reward, done)
-
-        # create a new variable scope
-        with tf.variable_scope("replay_memory"):
-            insert_op = tf.group(insert_count)
-            with tf.control_dependencies([insert_op]):
-                samples = self.__create_samples(self.sample_size)
-
-            return samples
-
     # ---------------------- Private Functions ---------------------------
 
-    def __create_samples(self, sample_size):
+    def sample_graph(self, sample_size):
         """This method creates the sampling operation.
 
         Args:

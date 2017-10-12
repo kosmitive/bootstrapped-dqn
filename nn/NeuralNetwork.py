@@ -22,8 +22,8 @@
 
 import numpy as np
 import tensorflow as tf
+import extensions.python_extensions as pe
 import extensions.tensorflow_extensions as tfe
-import extensions.tensorflow_extensions as tfh
 
 
 class NeuralNetwork:
@@ -40,6 +40,7 @@ class NeuralNetwork:
         self.vars = None
         self.log = {}
         self.conf = config
+        pe.set_default_val(self.conf, 'clip_by_norm', 0.3)
 
     # --- Graphs ---
 
@@ -116,7 +117,7 @@ class NeuralNetwork:
         # resize them again
         return [tf.reshape(q, grid_samples) for q in q_list]
 
-    def learn_graph(self, X, Y, scope, learning_rate, step_counter=None, clip_by_norm=3.0):
+    def learn_graph(self, X, Y, scope, learning_rate, step_counter):
         """This creates the graph for learning, in detail it can be used to
         learn to max X to Y
 
@@ -133,16 +134,39 @@ class NeuralNetwork:
         """
 
         # get huber loss from the error
-        loss = tf.reduce_mean(tfh.huber_loss(1.0, X - Y))
+        loss = tf.reduce_mean(self.get_loss(X, Y))
 
         # Create a minimizer
-        optimizer = tf.train.RMSPropOptimizer(learning_rate)
+        optimizer = self.get_minimizer(learning_rate)
         gradients = optimizer.compute_gradients(loss, var_list=self.log[scope])
         for i, (grad, var) in enumerate(gradients):
             if grad is not None:
-                gradients[i] = (tf.clip_by_norm(grad, clip_by_norm), var)
+                gradients[i] = (tf.clip_by_norm(grad, self.conf['clip_by_norm']), var)
 
         return optimizer.apply_gradients(gradients, global_step=step_counter)
+
+    # --- Setting Funcs ---
+
+    def get_loss(self, X, Y):
+        """This method takes inputs and targets and outputs and appropriate loss function
+        for each pair. This method can be overwritten by children to change the loss.
+
+        Args:
+            X: The predicted value from the network.
+            Y: The target value which the prediction should reach.
+
+        Returns:
+            A loss function, e.g. huber loss.
+        """
+        return tfe.huber_loss(1.0, X - Y)
+
+    def get_minimizer(self, learning_rate):
+        """This method delivers a minimizer. Overwrite this function to change the default.
+
+        Args:
+            learning_rate: The learning rate the optimizer should use."""
+        # Create a minimizer
+        return tf.train.AdamOptimizer(learning_rate)
 
     # --- Reused Funcs ---
 

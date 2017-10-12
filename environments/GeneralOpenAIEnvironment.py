@@ -1,13 +1,16 @@
 import gym
 import numpy as np
 import tensorflow as tf
+import threading
+import time
 
-from gym.envs.classic_control.mountain_car import MountainCarEnv
 from gym.spaces import Box
 from gym.spaces import Discrete
+from gym.envs.classic_control.mountain_car import MountainCarEnv
 from environments.Environment import Environment
 from spaces.ContinuousSpace import ContinuousSpace
 from spaces.DiscreteSpace import DiscreteSpace
+
 
 class GeneralOpenAIEnvironment(Environment):
 
@@ -24,25 +27,23 @@ class GeneralOpenAIEnvironment(Environment):
 
         # save properties
         self.env_name = env_name
-
-        # create the environment and verify spaces
-        self.env = gym.make(env_name)
-
-        # check if the spaces are valid
-        assert isinstance(self.env.observation_space, Box)
-        assert isinstance(self.env.action_space, Discrete)
-
-        # save the spaced correctly
-        self.o_space = ContinuousSpace(self.env.observation_space.shape[0],
-                                       self.env.observation_space.low,
-                                       self.env.observation_space.high)
-        self.a_space = DiscreteSpace(self.env.action_space.n)
         self.num_models = num_models
         self.real_dones = num_models * [False]
 
         # save the observation space
+        self.envs = [gym.make(env_name) for _ in range(num_models)]
+
+        # check if the spaces are valid
+        assert isinstance(self.envs[0].observation_space, Box)
+        assert isinstance(self.envs[0].action_space, Discrete)
+
+        # save the spaced correctly
+        self.o_space = ContinuousSpace(self.envs[0].observation_space.shape[0],
+                                       self.envs[0].observation_space.low,
+                                       self.envs[0].observation_space.high)
+        self.a_space = DiscreteSpace(self.envs[0].action_space.n)
+
         with tf.variable_scope(self.env_name):
-            self.envs = [gym.make(env_name) for _ in range(num_models)]
 
             # create pointer for the observation space itself
             init = tf.zeros([num_models, self.o_space.dim()], dtype=tf.float32)
@@ -54,36 +55,64 @@ class GeneralOpenAIEnvironment(Environment):
     def random_walk(self, steps):
         """This executes a random walk for x steps"""
 
-        current_observations = list()
-        next_observations = list()
-        rewards = list()
-        dones = list()
+        # get the maximum steps of all
+        interval = 1000
+        max_steps = int((steps * self.num_models + interval - 1) / interval)
 
-        # add to current observations
-        c_obs = self.env.reset()
-        np.random.seed(0)
-        all_actions = np.random.random_integers(0, self.a_space.dim() - 1, steps)
+        # define random walk function
+        def single_random_walk(model, results, rand_steps):
 
-        for s in range(steps):
-            if s % 1000 == 0: print("\tStep {}/{}".format(int(s / 1000), int((steps + 999) / 1000)))
-            n_obs, reward, done, _ = self.env.step(all_actions[s])
-            rewards.append(reward)
-            dones.append(done)
-            current_observations.append(c_obs)
-            next_observations.append(n_obs)
-            if done: self.env.reset()
-            c_obs = n_obs
+            np.random.seed(model)
+            current_observations = list()
+            next_observations = list()
+            rewards = list()
+            dones = list()
 
-        # finally reset it again
-        self.env.reset()
+            # add to current observations
+            c_obs = self.envs[model].reset()
+            np.random.seed(0)
+            all_actions = np.random.random_integers(0, self.a_space.dim() - 1, steps)
 
-        # now stack the lists up
-        fin_cobs = np.stack(next_observations)
-        fin_nobs = np.stack(current_observations)
-        fin_rews = np.stack(rewards)
-        fin_dones = np.stack(dones)
+            for s in range(steps):
+                n_obs, reward, done, _ = self.envs[model].step(all_actions[s])
+                rewards.append(reward)
+                dones.append(done)
+                current_observations.append(c_obs)
+                next_observations.append(n_obs)
+                #if done: self.envs[model].reset()
+                c_obs = n_obs
 
-        return fin_cobs, fin_nobs, all_actions, fin_rews, fin_dones
+                # every 1000 steps
+                if s % interval == 0:
+
+                    # increase rand step list
+                    rand_steps[model] += 1
+                    summed_steps = np.sum(rand_steps)
+                    print("\tModel_{}; Step {}/{}".format(model, summed_steps, max_steps))
+
+            # finally reset it again
+            self.envs[model].reset()
+
+            # now stack the lists up
+            fin_cobs = np.stack(next_observations)
+            fin_nobs = np.stack(current_observations)
+            fin_rews = np.stack(rewards)
+            fin_dones = np.stack(dones)
+            results[model] = [fin_cobs, fin_nobs, all_actions, fin_rews, fin_dones]
+
+        # iterate over all models
+        results = [None] * self.num_models
+        rand_steps = [0] * self.num_models
+
+        threads = list()
+        for k in range(self.num_models):
+            threads.append(threading.Thread(target=single_random_walk, args=(k, results, rand_steps)))
+            threads[k].start()
+
+        for k in range(len(threads)):
+            threads[k].join()
+
+        return results
 
     def observation_space(self):
         return self.o_space
@@ -128,7 +157,6 @@ class GeneralOpenAIEnvironment(Environment):
         return val
 
     def __one_step(self, action):
-
         observations = list()
         rewards = list()
         dones = list()
@@ -141,5 +169,4 @@ class GeneralOpenAIEnvironment(Environment):
             dones.append(done)
             stop_train_done.append(done and self.real_dones[k])
             self.real_dones[k] = done
-
         return np.stack(observations, 0), np.stack(rewards, 0), np.stack(dones, 0), np.stack(stop_train_done, 0)

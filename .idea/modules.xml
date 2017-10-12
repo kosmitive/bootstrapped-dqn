@@ -3,7 +3,6 @@
   <component name="ProjectModuleManager">
     <modules>
       <module fileurl="file://$PROJECT_DIR$/.idea/BootstrappedDQN.iml" filepath="$PROJECT_DIR$/.idea/BootstrappedDQN.iml" />
-      <module fileurl="file://$PROJECT_DIR$/../baselines/.idea/baselines.iml" filepath="$PROJECT_DIR$/../baselines/.idea/baselines.iml" />
     </modules>
   </component>
 </project>

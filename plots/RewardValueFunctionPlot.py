@@ -27,7 +27,8 @@ class RewardValueFunctionPlot(Plot):
         self.im_target_value_func = None
         self.im_actions = None
         self.plt_rewards = None
-        self.box = [state_space.IB[0], state_space.IE[0], state_space.IB[1], state_space.IE[1]]
+        self.box = [state_space.intervals[0][0], state_space.intervals[0][1],
+                    state_space.intervals[1][0], state_space.intervals[1][1]]
 
     def interactive(self):
         self.interactive = True

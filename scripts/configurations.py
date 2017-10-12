@@ -11,13 +11,13 @@ def ddqn_general_ddqn_eps_config(env_name, max_timesteps, num_models):
 
         # Replay memory
         replay_size = 50000
-        sample_size = 64
+        sample_size = 32
 
         # DQN
-        structure = [64, 64]
+        structure = [64]
         agent_config = {
                 'discount': 0.99,
-                'learning_rate': 0.00075,
+                'learning_rate': 0.001,
                 'target_offset': 500,
         }
 

@@ -111,7 +111,7 @@ class BootstrappedDDQNAgent(GeneralAgent):
 
         # calculate targets
         targets = dupl_rewards + self.discount * tf.cast(1 - dupl_dones, tf.float32) * target_best_q_values
-        learn = self.network.learn_graph(self.learning_rate, exec_q_values, tf.stop_gradient(targets), self.global_step)
+        learn = self.network.learn_graph(exec_q_values, tf.stop_gradient(targets), 'dqn', self.learning_rate, self.global_step)
 
         # execute only if in learning mode
         return learn
