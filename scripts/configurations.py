@@ -4,7 +4,7 @@ from memory.ExperienceReplayMemory import ExperienceReplayMemory
 from policies.EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from policies.GreedyPolicy import GreedyPolicy
 
-import extensions.tensorflowHelpers as tfh
+import extensions.tensorflow_extensions as tfh
 import tensorflow as tf
 
 def ddqn_general_ddqn_eps_config(env_name, max_timesteps, num_models):

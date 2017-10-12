@@ -73,7 +73,7 @@ for [agent_name, config, suffix, seed] in batch:
                 feedback = build_general_configuration(env, agents, memories, policies)
 
                 # get copy graph
-                copy = [agents[k].copy_graph() for k in range(num_models)]
+                copy = [agents[k].network.copy_graph('dqn', 'target') for k in range(num_models)]
                 is2d = env.observation_space().dim() == 2
 
                 # init the graph
@@ -83,13 +83,11 @@ for [agent_name, config, suffix, seed] in batch:
                 # reset the environment
                 env_res_op = env.reset_graph()
                 sess.run(env_res_op)
-
+                is2d = False
                 # obtain a grid for the q-function of the agent
                 if (save_best or save_plot or plot_interactive) and is2d:
                     with tf.variable_scope("0"):
-                        agents[0].network.switch('dqn')
                         q_functions = agents[0].network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
-                        agents[0].network.switch('target')
                         t_q_functions = agents[0].network.grid_graph([grid_granularity, grid_granularity], env.observation_space().IB, env.observation_space().IE)
 
                 # Fill the replay memory

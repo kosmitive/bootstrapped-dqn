@@ -1,14 +1,14 @@
 # simply import the numpy package.
 import tensorflow as tf
 
-import extensions.tensorflowHelpers as tfh
+import extensions.tensorflow_extensions as tfh
 from memory.Memory import Memory
-from nn.DeepNetwork import DeepNetwork
+from nn.FeedForwardNetwork import FeedForwardNetwork
 from policies.Policy import Policy
 from environments.Environment import Environment
-from agents.Agent import Agent
+from agents.GeneralAgent import GeneralAgent
 
-class DDQNAgent(Agent):
+class DDQNAgent(GeneralAgent):
     """this is the agent playing the game and trying to maximize the reward."""
 
     def __init__(self, env, structure, config):
@@ -20,12 +20,7 @@ class DDQNAgent(Agent):
             config:
                 - offset: Number of steps till the value should be copied
         """
-
-        assert isinstance(env, Environment)
-
-        # obtain the spaces
-        self.state_space = env.observation_space()
-        self.action_space = env.action_space()
+        super().__init__("DDQN", env, config)
 
         # set the internal debug variable
         self.memory = None
@@ -39,24 +34,12 @@ class DDQNAgent(Agent):
 
         # init necessary objects
         net_struct = [env.observation_space().dim()] + structure + [env.action_space().dim()]
-        self.network = DeepNetwork(net_struct, {"layer-norm" : True})
+        self.network = FeedForwardNetwork(net_struct, {"layer-norm" : True})
 
         # create iteration counter
         self.counter_init = tf.zeros([], dtype=tf.int32)
         self.iteration_counter = tf.Variable(0, trainable=False)
         self.global_step = tf.Variable(0, trainable=False)
-
-    def copy_graph(self):
-        self.network.switch('dqn')
-        return self.network.copy_graph('target')
-
-    def register_memory(self, memory):
-        assert isinstance(memory, Memory)
-        self.memory = memory
-
-    def register_policy(self, policy):
-        assert isinstance(policy, Policy)
-        self.policy = policy
 
     def action_graph(self, current_observation):
         """This method creates the action graph using the current observation. The policy
@@ -68,23 +51,28 @@ class DDQNAgent(Agent):
         assert self.policy is not None
 
         # choose appropriate action
-        self.network.switch('dqn')
-        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0))
+        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0), 'dqn')
         return self.policy.choose_action(eval_graph)
 
-    def observe_graph(self, current_observation, next_observation, action, reward, done):
-        assert self.memory is not None
+    def learn_graph(self, current_states, next_states, actions, rewards, dones):
+        """This graph takes N experience tuple  uses these to create a minimizer.
 
-        # retrieve all samples
-        current_states, next_states, actions, rewards, dones = self.memory.store_and_sample_graph(current_observation, next_observation, action, reward, done)
+        Args:
+            current_states: The current observations
+            next_states: The next observations
+            actions: The chosen actions
+            rewards: The reward received for performing the actions
+            dones: Whether the episode is finished or not.
+
+        Returns:
+            A operation which learns from the samples.
+        """
 
         # get both q functions
-        self.network.switch('dqn')
-        current_q = self.network.eval_graph(current_states, train=True)
-        next_q = self.network.eval_graph(next_states, train=True)
+        current_q = self.network.eval_graph(current_states, train=True, scope='dqn')
+        next_q = self.network.eval_graph(next_states, train=True, scope='dqn')
 
-        self.network.switch('target')
-        target_next_q = self.network.eval_graph(next_states)
+        target_next_q = self.network.eval_graph(next_states, scope='target')
         best_next_actions = tf.cast(tf.argmax(next_q, axis=1), tf.int32)
 
         sample_rng = tf.range(0, tf.size(actions), dtype=tf.int32)
@@ -96,8 +84,7 @@ class DDQNAgent(Agent):
 
         # calculate targets
         targets = rewards + self.discount * tf.cast(1 - dones, tf.float32) * target_best_q_values
-        self.network.switch('dqn')
-        learn = self.network.learn_graph(self.learning_rate, exec_q_values, tf.stop_gradient(targets), self.global_step)
+        learn = self.network.learn_graph(exec_q_values, tf.stop_gradient(targets), 'dqn', self.learning_rate, self.global_step)
 
         # execute only if in learning mode
         return learn

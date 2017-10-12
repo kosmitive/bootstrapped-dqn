@@ -1,14 +1,14 @@
 # simply import the numpy package.
 import tensorflow as tf
 
-import extensions.tensorflowHelpers as tfh
+import extensions.tensorflow_extensions as tfh
 from memory.Memory import Memory
-from nn.MultipleHeadDeepNetwork import MultipleHeadDeepNetwork
+from nn.MultipleHeadDee2pNetwork import MultipleHeadDeepNetwork
 from policies.Policy import Policy
 from environments.Environment import Environment
-from agents.Agent import Agent
+from agents.GeneralAgent import GeneralAgent
 
-class BootstrappedDDQNAgent(Agent):
+class BootstrappedDDQNAgent(GeneralAgent):
     """this is the agent playing the game and trying to maximize the reward."""
 
     def __init__(self, env, shared_structure, head_structure, num_heads, config):
@@ -85,11 +85,9 @@ class BootstrappedDDQNAgent(Agent):
         current_states, next_states, actions, rewards, dones = self.memory.store_and_sample_graph(current_observation, next_observation, action, reward, done)
 
         # get both q functions
-        self.network.switch('bootstrappeddqn')
         current_q = self.network.eval_graph(current_states, train=True)
         next_q = self.network.eval_graph(next_states, train=True)
 
-        self.network.switch('bootstrappedtarget')
         target_next_q = self.network.eval_graph(next_states)
         best_next_actions = tf.reshape(tf.cast(tf.argmax(next_q, axis=1), tf.int32), [self.memory.sample_size * self.heads])
 
@@ -113,7 +111,6 @@ class BootstrappedDDQNAgent(Agent):
 
         # calculate targets
         targets = dupl_rewards + self.discount * tf.cast(1 - dupl_dones, tf.float32) * target_best_q_values
-        self.network.switch('bootstrappeddqn')
         learn = self.network.learn_graph(self.learning_rate, exec_q_values, tf.stop_gradient(targets), self.global_step)
 
         # execute only if in learning mode

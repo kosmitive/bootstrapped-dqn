@@ -1,7 +1,7 @@
 import tensorflow as tf
-import extensions.tensorflowHelpers as tfh
+import extensions.tensorflow_extensions as tfh
 
-from agents.Agent import Agent
+from agents.GeneralAgent import GeneralAgent
 from memory.Memory import Memory
 from environments.Environment import Environment
 from policies.Policy import Policy
