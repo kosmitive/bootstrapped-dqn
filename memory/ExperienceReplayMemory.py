@@ -1,9 +1,7 @@
 import tensorflow as tf
 
-from environments.Environment import Environment
+from environments.ContinualStateEnv import ContinualStateEnv
 from memory.Memory import Memory
-from spaces.ContinuousSpace import ContinuousSpace
-from spaces.DiscreteSpace import DiscreteSpace
 
 
 class ExperienceReplayMemory(Memory):
@@ -24,7 +22,7 @@ class ExperienceReplayMemory(Memory):
         # check if this is a valid size
         assert size > 0
         assert sample_size <= size
-        assert isinstance(env, Environment)
+        assert isinstance(env, ContinualStateEnv)
         super().__init__(sample_size)
 
         # obtain the spaces

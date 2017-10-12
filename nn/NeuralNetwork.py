@@ -20,10 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import extensions.python_extensions as pe
 import numpy as np
 import tensorflow as tf
-import extensions.python_extensions as pe
-import extensions.tensorflow_extensions as tfe
+
+import utils.extensions.tensorflow_extensions as tfe
 
 
 class NeuralNetwork:

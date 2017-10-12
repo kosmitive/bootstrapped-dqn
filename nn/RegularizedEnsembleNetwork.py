@@ -20,10 +20,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import tensorflow as tf
-import extensions.tensorflow_extensions as tfe
 import extensions.python_extensions as pe
+import tensorflow as tf
 
+import utils.extensions.tensorflow_extensions as tfe
 from nn.FiniteEnsembleNetwork import FiniteEnsembleNetwork
 
 
