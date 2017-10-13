@@ -20,9 +20,9 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+from environments.open_ai_envs.ContinualStateEnv import ContinualStateEnv
 from memory.Memory import Memory
 from policies.Policy import Policy
-from environments.Environment import Environment
 
 
 class GeneralAgent:
@@ -39,8 +39,9 @@ class GeneralAgent:
         # save vars
         self.name = name
         self.conf = conf
+
         # check if correct instances
-        assert isinstance(env, Environment)
+        assert isinstance(env, ContinualStateEnv)
 
         # save the spaces
         self.state_space = env.observation_space()

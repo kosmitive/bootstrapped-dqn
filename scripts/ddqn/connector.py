@@ -1,11 +1,5 @@
 import tensorflow as tf
-import extensions.tensorflow_extensions as tfh
 
-from agents.GeneralAgent import GeneralAgent
-from memory.Memory import Memory
-from environments.Environment import Environment
-from policies.Policy import Policy
-from policies.RandomPolicy import RandomPolicy
 
 def build_general_configuration(env, agents, memories, policies):
 
@@ -33,7 +27,7 @@ def build_general_configuration(env, agents, memories, policies):
     for k in range(num_models):
         with tf.variable_scope(str(k)):
             agents[k].register_memory(memories[k])
-            minimizer.append(agents[k].observe_graph(current_observation[k, :], next_observation[k, :], actions[k], rewards[k], dones[k]))
+            minimizer.append(agents[k].experience_graph(current_observation[k, :], next_observation[k, :], actions[k], rewards[k], dones[k]))
             cond_minimizer.append(tf.cond(tf.cast(real_dones[k], tf.bool), lambda: tf.no_op(), lambda: minimizer[k]))
 
     # execute the minimizer before "applying" the action

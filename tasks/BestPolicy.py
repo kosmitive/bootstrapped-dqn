@@ -1,11 +1,11 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import matplotlib.patches as patches
-from environments.GridWorld import GridWorld
-from environments.ExplorationChain import ExplorationChain
+import matplotlib.pyplot as plt
+import numpy as np
 from environments.BinaryFlipEnvironment import BinaryFlipEnvironment
-from environments.DeepSeaExploration import DeepSeaExploration
 from environments.DeepSeaExplorationTwo import DeepSeaExplorationTwo
+from environments.ExplorationChain import ExplorationChain
+
+from environments.deterministic_mdps.GridWorld import GridWorld
 
 env = "binflip"
 if env == "grid":

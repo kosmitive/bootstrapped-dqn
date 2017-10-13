@@ -1,7 +1,7 @@
 import numpy as np
+from environments.spaces import DiscreteSpace
 
-from environments.DeterministicMDP import DeterministicMDP
-from spaces.DiscreteSpace import DiscreteSpace
+from environments.deterministic_mdps.DeterministicMDP import DeterministicMDP
 
 
 class ExplorationChain(DeterministicMDP):

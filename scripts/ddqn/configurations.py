@@ -1,24 +1,25 @@
-from agents.DDQNAgent import DDQNAgent
-from environments.GeneralOpenAIEnvironment import GeneralOpenAIEnvironment
+import tensorflow as tf
+
+import utils.extensions.tensorflow_extensions as tfh
+from agents.defs.DDQNAgent import DDQNAgent
+from environments.open_ai_envs.BackedGeneralOpenAIEnvironment import GeneralOpenAIEnvironment
 from memory.ExperienceReplayMemory import ExperienceReplayMemory
 from policies.EpsilonGreedyPolicy import EpsilonGreedyPolicy
 from policies.GreedyPolicy import GreedyPolicy
 
-import extensions.tensorflow_extensions as tfh
-import tensorflow as tf
 
 def ddqn_general_ddqn_eps_config(env_name, max_timesteps, num_models):
 
         # Replay memory
-        replay_size = 50000
-        sample_size = 32
+        replay_size = 65000
+        sample_size = 64
 
         # DQN
-        structure = [64]
+        structure = [256, 256]
         agent_config = {
                 'discount': 0.99,
-                'learning_rate': 0.001,
-                'target_offset': 500,
+                'learning_rate': 0.00075,
+                'target_offset': 2000,
         }
 
         # Exploration reduction

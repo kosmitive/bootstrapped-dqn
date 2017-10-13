@@ -135,3 +135,4 @@ def eval_fc_layer(Q, shape, activation=identity(), layer_norm=False, mask=None, 
 
     # last but not least apply zoneout
     return exp_mask * v + (1 - exp_mask) * Q if use_zoneout else v
+

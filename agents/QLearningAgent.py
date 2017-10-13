@@ -1,13 +1,12 @@
 # simply import the numpy package.
 import tensorflow as tf
-import collections
 
-from policies.GreedyPolicy import GreedyPolicy
-from spaces.DiscreteSpace import DiscreteSpace
-from environments.DeterministicMDP import DeterministicMDP
-from density_models.CountBasedModel import CountBasedModel
 from density_models.CountBasedAdapter import CountBasedAdapter
+from density_models.CountBasedModel import CountBasedModel
 from density_models.NADEModel import NADEModel
+from environments.deterministic_mdps.DeterministicMDP import DeterministicMDP
+from policies.GreedyPolicy import GreedyPolicy
+
 
 class QLearningAgent:
     """This class represents a basic tabular q learning agent."""

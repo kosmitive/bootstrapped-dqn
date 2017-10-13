@@ -1,21 +1,17 @@
 import os
+
 import matplotlib
+
 matplotlib.use("Agg")
 import numpy as np
-import matplotlib.pyplot as plt
 import tensorflow as tf
 import time
 
 from agents.QLearningAgent import QLearningAgent
 from collection.ColorCollection import ColorCollection
 from collection.PolicyCollection import PolicyCollection
-from environments.GridWorld import GridWorld
-from environments.BinaryFlipEnvironment import BinaryFlipEnvironment
-from environments.DeepSeaExploration import DeepSeaExploration
-from environments.DeepSeaExplorationTwo import DeepSeaExplorationTwo
-from environments.DeepSeaExplorationThree import DeepSeaExplorationThree
-from environments.DeepSeaExplorationFour import DeepSeaExplorationFour
-from environments.ExplorationChain import ExplorationChain
+from environments.deterministic_mdps.GridWorld import GridWorld
+from environments.deterministic_mdps.ExplorationChain import ExplorationChain
 from manager.DirectoryManager import DirectoryManager
 from plots.MultiDimensionalHeatMap import MultiDimensionalHeatmap
 

@@ -1,10 +1,10 @@
 import numpy as np
+from environments.spaces import DiscreteSpace
 
-from environments.DeterministicMDP import DeterministicMDP
-from spaces.DiscreteSpace import DiscreteSpace
+from environments.deterministic_mdps.DeterministicMDP import DeterministicMDP
 
 
-class DeepSeaExplorationTwo(DeterministicMDP):
+class DeepSeaExploration(DeterministicMDP):
 
     def __init__(self, name, num_states, N):
 
@@ -25,9 +25,9 @@ class DeepSeaExplorationTwo(DeterministicMDP):
         reward_function = np.zeros((size_space, size_action), dtype=np.float64)
 
         # sample the left action
-        left = 1
+        left = 0
         right = 1 - left
-        chest = 2 * 1 - 1
+        chest = 2 * 0 - 1
 
         # iterate over and fill with the transitions
         for x in range(N):
@@ -45,4 +45,4 @@ class DeepSeaExplorationTwo(DeterministicMDP):
         super().__init__(name, num_states, action_space, state_space, transition_func, reward_function, starting_state)
 
     def get_name(self):
-        return "deep_sea_two"
+        return "deep_sea_one"

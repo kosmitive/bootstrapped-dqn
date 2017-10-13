@@ -1,31 +1,49 @@
-# simply import the numpy package.
+# MIT License
+#
+# Copyright (c) 2017 Markus Semmler
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import tensorflow as tf
 
-import extensions.tensorflow_extensions as tfh
-from memory.Memory import Memory
-from nn.MultipleHeadDee2pNetwork import MultipleHeadDeepNetwork
-from policies.Policy import Policy
-from environments.Environment import Environment
 from agents.GeneralAgent import GeneralAgent
+from environments.open_ai_envs.ContinualStateEnv import ContinualStateEnv
+from memory.Memory import Memory
+from policies.Policy import Policy
+
 
 class BootstrappedDDQNAgent(GeneralAgent):
-    """this is the agent playing the game and trying to maximize the reward."""
+    """This represents a bootstrapped DQN agent. It basically approximates a
+    posterior over Q."""
 
     def __init__(self, env, shared_structure, head_structure, num_heads, config):
         """Constructs a BootstrappedDDQNAgent.
 
         Args:
             env: The environment
-            structure: Define the number of layers
+            shared_structure: Define the number of layers
             config:
                 - offset: Number of steps till the value should be copied
         """
 
-        assert isinstance(env, Environment)
-
-        # obtain the spaces
-        self.state_space = env.observation_space()
-        self.action_space = env.action_space()
+        assert isinstance(env, ContinualStateEnv)
+        super().__init__("bootstrapped_dqn", env, config)
 
         # set the internal debug variable
         self.memory = None

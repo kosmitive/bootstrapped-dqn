@@ -1,29 +1,29 @@
 import datetime
 import time
-import os
+
 import numpy as np
 import tensorflow as tf
+from scripts.connector import build_general_configuration
 from tensorflow.python.client import timeline
 
 from manager.DirectoryManager import DirectoryManager
 from plots.RewardValueFunctionPlot import RewardValueFunctionPlot
-from scripts.configurations import ddqn_general_ddqn_eps_config
-from scripts.configurations import ddqn_general_ddqn_greedy_config
-from scripts.connector import build_general_configuration
+from scripts.ddqn.configurations import ddqn_general_ddqn_eps_config
+from scripts.ddqn.configurations import ddqn_general_ddqn_greedy_config
 
 # the run settings
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-batch = [["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 35],
+batch = [["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 56],
          ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 36]]
 
 # the settings for the framework
-epochs = 100
+epochs = 2500
 
 save_epoch = 100
-save_plot = False
-save_best = False
+save_plot = True
+save_best = True
 num_models = 5
 
 plot_as_variance = False
