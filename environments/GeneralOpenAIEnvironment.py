@@ -27,7 +27,7 @@ import tensorflow as tf
 from gym.spaces import Box
 from gym.spaces import Discrete
 from environments.Environment import Environment
-from utils.Space import Space
+from util.Space import Space
 from multiprocessing.dummy import Pool as ThreadPool
 
 

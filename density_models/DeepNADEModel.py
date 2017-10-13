@@ -146,7 +146,7 @@ class DeepNADEModel:
         # Hence we want to melt, them to a 4 dimensional tensor using the einsum
         v = tf.einsum('pde,ek->pdek', mask_tensor, self.v)
 
-        # build computational tree
+        # builder computational tree
         tree = v
         next_tree = v
 

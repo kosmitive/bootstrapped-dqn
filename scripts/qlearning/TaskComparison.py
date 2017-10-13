@@ -1,3 +1,25 @@
+# MIT License
+#
+# Copyright (c) 2017 Markus Semmler
+#
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+#
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+#
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 import os
 
 import matplotlib
@@ -8,35 +30,25 @@ import tensorflow as tf
 import time
 
 from agents.QLearningAgent import QLearningAgent
-from collection.ColorCollection import ColorCollection
-from collection.PolicyCollection import PolicyCollection
+from util.collection.ColorCollection import ColorCollection
+from util.collection.PolicyCollection import PolicyCollection
 from environments.deterministic_mdps.GridWorld import GridWorld
-from environments.deterministic_mdps.ExplorationChain import ExplorationChain
-from manager.DirectoryManager import DirectoryManager
+from util.manager.DirManager import DirManager
 from plots.MultiDimensionalHeatMap import MultiDimensionalHeatmap
 
 # ------------------------------ SETTINGS ------------------------------------
 
+# define the batch for the problems
+batch = ['shared_bootstrap', 'bootstrapped', 'boltzmann',  'cb_pseudo_count',
+         'optimistic', 'ucb', 'bootstrapped_heads_per_sample', 'ucb_infogain',
+         'pc_pseudo_count', 'deterministic_bootstrapped_cb_pseudo_count']
+
+# define all runs which should be performed
 run = list()
-
-new_envs = [[GridWorld, [10], lambda n: 2 * n, 2500]]
-new_batch_names = [['shared_bootstrap', []], ['bootstrapped', []],
-                   ['boltzmann', []], ['cb_pseudo_count', []],
-                   ['optimistic', []], ['ucb', []],
-                   ['pc_pseudo_count', []], ['deterministic_bootstrapped_cb_pseudo_count',[]]]
-
-run.append([new_envs, new_batch_names])
-
-new_envs = [[ExplorationChain, [50], lambda n: n + 9, 2500]]
-new_batch_names = [['shared_bootstrap', []], ['bootstrapped', []],
-                   ['boltzmann', []], ['cb_pseudo_count', []],
-                   ['optimistic', []], ['ucb', []],
-                   ['bootstrapped_heads_per_sample', []], ['ucb_infogain', []],
-                   ['pc_pseudo_count', []], ['deterministic_bootstrapped_cb_pseudo_count',[]]]
-run.append([new_envs, new_batch_names])
+env = [GridWorld, 10, lambda n: 2 * n, 2500]
+run.append([env, batch])
 
 save_directory = "run/CompleteRuns2"
-#num_models = 1000
 num_episodes = 10000
 
 #record_indices = []  # 0, 1, 2, 3]
@@ -46,8 +58,8 @@ save_frame = 1
 fps = 15
 shared_learning_steps = 32
 
-for [all_envs, batch_names] in run:
-    for [env_build, problem_sizes, problem_to_step, num_models] in all_envs:
+for all_envs, batch_names in run:
+    for env_build, problem_sizes, problem_to_step, num_models in all_envs:
 
         for N in problem_sizes:
             for [batch_name, record_indices] in batch_names:
@@ -74,7 +86,7 @@ for [all_envs, batch_names] in run:
                         color_pool = ColorCollection.get_colors()
 
                         # define the different policies you want to try out
-                        dir_manager = DirectoryManager(save_directory)
+                        dir_manager = DirManager(save_directory)
                         dir_manager.set_env_dir("{}_{}".format(env.get_name(), N))
                         dir_manager.set_agent_dir(batch_name)
                         policies = PolicyCollection.get_batch(batch_name)

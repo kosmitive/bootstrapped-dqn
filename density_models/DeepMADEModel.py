@@ -22,7 +22,7 @@ class DeepMADEModel:
         self.x = tf.placeholder(tf.float64, [self.D, None], name="x")
         self.init_weights()
 
-        # now we want to build up the probability model
+        # now we want to builder up the probability model
         hp = self.x
         for l in range(1, self.L + 1):
             hp = tf.sigmoid(tf.matmul(tf.add(self.b[l - 1], tf.multiply(self.W[l - 1], self.MW[l - 1])), hp))
@@ -33,7 +33,7 @@ class DeepMADEModel:
                                        tf.multiply(tf.add(tf.ones([self.D], tf.float64), tf.negative(self.x)),
                                                    tf.log(tf.add(tf.ones([self.D], tf.float64), tf.negative(xtop)))))), axis=0))
 
-        # build the negative log likelihood and use it inside the
+        # builder the negative log likelihood and use it inside the
         # minimizer
         self.nll = tf.reduce_mean(tf.reduce_sum(tf.negative(tf.add(tf.multiply(self.x, tf.log(xtop)), tf.multiply(tf.constant(1.0, tf.float64) - self.x,
                                                                                                    tf.log(tf.constant(1.0, tf.float64) - xtop)))), axis=0), axis=0)

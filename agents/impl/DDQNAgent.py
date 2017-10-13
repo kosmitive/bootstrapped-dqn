@@ -23,10 +23,10 @@
 # simply import the numpy package.
 import tensorflow as tf
 from nn.FeedForwardNetwork import FeedForwardNetwork
-from agents.GeneralAgent import GeneralAgent
+from agents.RLAgent import RLAgent
 
 
-class DDQNAgent(GeneralAgent):
+class DDQNAgent(RLAgent):
     """this is the agent playing the game and trying to maximize the reward."""
 
     def __init__(self, env, structure, config):
@@ -51,7 +51,7 @@ class DDQNAgent(GeneralAgent):
         self.learning_rate = config['learning_rate']
 
         # init necessary objects
-        net_struct = [env.observation_space().dim()] + structure + [env.action_space().dim()]
+        net_struct = [env.state_space.D] + structure + [env.action_space.D]
         self.network = FeedForwardNetwork(net_struct, {"layer-norm" : True})
 
         # create iteration counter
@@ -59,18 +59,16 @@ class DDQNAgent(GeneralAgent):
         self.iteration_counter = tf.Variable(0, trainable=False)
         self.global_step = tf.Variable(0, trainable=False)
 
-    def action_graph(self, current_observation):
+    def action_eval_graph(self, current_observation):
         """This method creates the action graph using the current observation. The policy
         has to be of type Policy.
 
         Args:
             current_observation: The current observation
         """
-        assert self.policy is not None
 
         # choose appropriate action
-        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0), 'dqn')
-        return self.policy.choose_action(eval_graph)
+        return self.network.eval_graph(tf.expand_dims(current_observation, 0), 'dqn')
 
     def learn_graph(self, current_states, next_states, actions, rewards, dones):
         """This graph takes N experience tuple  uses these to create a minimizer.

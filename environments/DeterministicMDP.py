@@ -2,7 +2,7 @@
 import numpy as np
 import tensorflow as tf
 
-from utils.Space import Space
+from util.Space import Space
 from environments.Environment import Environment
 
 

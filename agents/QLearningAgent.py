@@ -1,11 +1,11 @@
 # simply import the numpy package.
 import tensorflow as tf
+from environments.deterministic_mdps.DeterministicMDP import DeterministicMDP
 
 from density_models.CountBasedAdapter import CountBasedAdapter
 from density_models.CountBasedModel import CountBasedModel
 from density_models.NADEModel import NADEModel
-from environments.deterministic_mdps.DeterministicMDP import DeterministicMDP
-from policies.GreedyPolicy import GreedyPolicy
+from policies.impl.GreedyPolicy import GreedyPolicy
 
 
 class QLearningAgent:

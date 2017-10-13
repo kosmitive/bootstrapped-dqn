@@ -41,12 +41,13 @@ class Space:
         """
 
         self.dims = dims
+        self.dims = [[dim] if isinstance(dim, int) else dim for dim in self.dims]
         self.D = len(self.dims)
         self.is_continuous = np.equal(self.D, 2)
         self.is_discrete = np.equal(self.D, 1)
 
         # define the bounds as well.
-        l_bounds = [len(dim) + (1 - len(dim)) * dim for dim in self.dims]
+        l_bounds = [2 - len(dim) + (len(dim) - 1) * dim[0] for dim in self.dims]
         r_bounds = [dim[-1] for dim in self.dims]
         self.bounds = np.array(zip(l_bounds, r_bounds))
 

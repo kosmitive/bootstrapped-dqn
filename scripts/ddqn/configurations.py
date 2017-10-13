@@ -1,11 +1,11 @@
 import tensorflow as tf
+from environments.GeneralOpenAIEnvironment import GeneralOpenAIEnvironment
+from policies.impl.EpsilonGreedyPolicy import EpsilonGreedyPolicy
 
-import utils.extensions.tensorflow_extensions as tfh
-from agents.defs.DDQNAgent import DDQNAgent
-from environments.open_ai_envs.BackedGeneralOpenAIEnvironment import GeneralOpenAIEnvironment
+import util.extensions.tensorflow_extensions as tfh
+from agents.impl.DDQNAgent import DDQNAgent
 from memory.ExperienceReplayMemory import ExperienceReplayMemory
-from policies.EpsilonGreedyPolicy import EpsilonGreedyPolicy
-from policies.GreedyPolicy import GreedyPolicy
+from policies.impl.GreedyPolicy import GreedyPolicy
 
 
 def ddqn_general_ddqn_eps_config(env_name, max_timesteps, num_models):
@@ -35,7 +35,7 @@ def ddqn_general_ddqn_eps_config(env_name, max_timesteps, num_models):
         exploration_parameters = [tfh.linear_decay(int(decay_lambda * 100000),
                                                  exp_rate_begin, exp_rate_end, agents[k].global_step) for k in range(num_models)]
 
-        exploration_strategies = [EpsilonGreedyPolicy(env.action_space(), exploration_parameters[k]) for k in range(num_models)]
+        exploration_strategies = [EpsilonGreedyPolicy(env.action_space, exploration_parameters[k]) for k in range(num_models)]
         return [env, agents, memories, exploration_strategies, exploration_parameters], agent_config
 
 

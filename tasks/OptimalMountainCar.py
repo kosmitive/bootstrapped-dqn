@@ -21,7 +21,7 @@ vel_step = (2 * max_speed) / discretization
 print("pos_step is {}".format(pos_step))
 print("vel_step is {}".format(vel_step))
 
-# build the transition matrix
+# builder the transition matrix
 trans = np.zeros([discretization, discretization, 3, 3])
 rews = np.zeros([discretization, discretization, 3, 1]) * -1
 

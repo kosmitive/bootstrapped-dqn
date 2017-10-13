@@ -22,13 +22,13 @@
 
 import tensorflow as tf
 
-from agents.GeneralAgent import GeneralAgent
+from agents.RLAgent import RLAgent
 from environments.open_ai_envs.ContinualStateEnv import ContinualStateEnv
 from memory.Memory import Memory
 from policies.Policy import Policy
 
 
-class BootstrappedDDQNAgent(GeneralAgent):
+class BootstrappedDDQNConnector(RLAgent):
     """This represents a bootstrapped DQN agent. It basically approximates a
     posterior over Q."""
 
@@ -82,7 +82,7 @@ class BootstrappedDDQNAgent(GeneralAgent):
         assert isinstance(policy, Policy)
         self.policy = policy
 
-    def action_graph(self, current_observation):
+    def action_eval_graph(self, current_observation):
         """This method creates the action graph using the current observation. The policy
         has to be of type Policy.
 
@@ -109,7 +109,7 @@ class BootstrappedDDQNAgent(GeneralAgent):
         target_next_q = self.network.eval_graph(next_states)
         best_next_actions = tf.reshape(tf.cast(tf.argmax(next_q, axis=1), tf.int32), [self.memory.sample_size * self.heads])
 
-        # build initial ranges
+        # builder initial ranges
         sample_rng = tf.range(0, self.memory.sample_size, dtype=tf.int32)
         head_rng = tf.range(0, self.heads, dtype=tf.int32)
 

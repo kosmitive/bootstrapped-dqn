@@ -19,9 +19,13 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import tensorflow as tf
 
-class Policy:
-    """Just the standard interface any policy has to full fill."""
+from policies.Policy import Policy
+
+
+class BoltzmannPolicy(Policy):
+    """Represents a Boltzmann Policy."""
 
     def choose_action(self, q):
         """This method of a policies_nn basically gets a Q function
@@ -34,4 +38,17 @@ class Policy:
 
         Returns: The index of the action that should be taken
         """
-        raise NotImplementedError("Please implement choose_action method")
+
+        # get the number of states
+        soft_max = tf.nn.softmax(q / config['temperature'])
+
+        # create the categorical
+        dist = tf.distributions.Categorical(probs=soft_max)
+        actions = tf.cast(dist.sample(), tf.int64)
+        actions = actions
+
+        # pass back the actions and corresponding q values
+        model_range = tf.range(0, config['num_models'], 1, dtype=tf.int64)
+        indices = tf.stack([model_range, actions], axis=1)
+        q_values = tf.gather_nd(q, indices)
+        return actions, q_values

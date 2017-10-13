@@ -3,15 +3,15 @@ import time
 
 import numpy as np
 import tensorflow as tf
-from scripts.connector import build_general_configuration
 from tensorflow.python.client import timeline
 
-from manager.DirectoryManager import DirectoryManager
 from plots.RewardValueFunctionPlot import RewardValueFunctionPlot
 from scripts.ddqn.configurations import ddqn_general_ddqn_eps_config
 from scripts.ddqn.configurations import ddqn_general_ddqn_greedy_config
+from scripts.ddqn.connector import build_general_configuration
+from util.manager.DirManager import DirManager
 
-# the run settings
+# ------------------- Settings
 name = "MountainCar-v0"
 run_folder = "./run/"
 
@@ -50,7 +50,7 @@ for [agent_name, config, suffix, seed] in batch:
     print(line_size * "=")
 
     # first of all join the names
-    dir_man = DirectoryManager(run_folder, name, "{}_{}".format(agent_name, seed))
+    dir_man = DirManager(run_folder, name, "{}_{}".format(agent_name, seed))
 
     # create the reward graph
     rewards = np.zeros((num_models, epochs))
@@ -59,12 +59,8 @@ for [agent_name, config, suffix, seed] in batch:
     graph = tf.Graph()
     with graph.as_default():
         tf_config = tf.ConfigProto(log_device_placement=True)
-        #tf_config.intra_op_parallelism_threads = 8
-        #tf_config.inter_op_parallelism_threads = 8
-        #tf_config.graph_options.optimizer_options.global_jit_level = tf.OptimizerOptions.ON_1
         tf_config.gpu_options.allow_growth=True
         with tf.Session(graph=graph, config=tf_config) as sess:
-            #os.environ['LD_LIBRARY_PATH'] = "/opt/cuda"
             options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
             run_metadata = tf.RunMetadata()
 
@@ -187,10 +183,5 @@ for [agent_name, config, suffix, seed] in batch:
                 # save the rewards on each step
                 dir_man.save_plot(rew_va_plt, epochs)
                 dir_man.save_rewards(rewards)
-
-        fetched_timeline = timeline.Timeline(run_metadata.step_stats)
-        chrome_trace = fetched_timeline.generate_chrome_trace_format()
-        with open('timeline_01.json', 'w') as f:
-            f.write(chrome_trace)
 
     if plot_interactive: rew_va_plt.show()

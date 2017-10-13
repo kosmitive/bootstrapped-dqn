@@ -20,15 +20,15 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from environments.open_ai_envs.ContinualStateEnv import ContinualStateEnv
+from environments.Environment import Environment
 from memory.Memory import Memory
 from policies.Policy import Policy
 
 
-class GeneralAgent:
+class RLAgent:
 
     def __init__(self, name, env, conf):
-        """Constructs an interface of NeuralAgent.
+        """Constructs an interface of RLAgent.
 
         Args:
             name: The name of the agent.
@@ -41,29 +41,24 @@ class GeneralAgent:
         self.conf = conf
 
         # check if correct instances
-        assert isinstance(env, ContinualStateEnv)
+        assert isinstance(env, Environment)
 
         # save the spaces
-        self.state_space = env.observation_space()
-        self.action_space = env.action_space()
+        self.state_space = env.state_space
+        self.action_space = env.action_space
 
         # some initial standard settings
         self.memory = None
         self.policy = None
+        self.network = None
+        self.reward_terms = list()
 
     # --- Register Points -----------------------------------------------
 
-    def register_memory(self, memory):
-        assert isinstance(memory, Memory)
-        self.memory = memory
-
-    def register_policy(self, policy):
-        assert isinstance(policy, Policy)
-        self.policy = policy
 
     # --- Graphs -----------------------------------------------
 
-    def pre_episode_graph(self):
+    def init_episode_graph(self):
         """This graph is executed before an episode is executed before each episode.
 
         Returns:
@@ -71,7 +66,7 @@ class GeneralAgent:
         """
         raise NotImplementedError()
 
-    def action_graph(self, current_observations):
+    def action_eval_graph(self, current_observations):
         """This graph takes NxD observations and outputs the chosen actions.
 
         Args:
@@ -96,6 +91,8 @@ class GeneralAgent:
         Returns:
             A operation which learns from the samples.
         """
+
+
         exp_tuple = (current_observation, next_observation, action, reward, done)
 
         if self.memory is None:

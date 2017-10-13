@@ -20,9 +20,10 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-from policies.GreedyPolicy import GreedyPolicy
 from policies.BoltzmannPolicy import BoltzmannPolicy
 from policies.EpsilonGreedyPolicy import EpsilonGreedyPolicy
+
+from policies.impl.GreedyPolicy import GreedyPolicy
 
 
 class PolicyCollection:

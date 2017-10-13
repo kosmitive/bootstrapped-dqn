@@ -1,5 +1,6 @@
 from collection.ColorCollection import ColorCollection
-from collection.PolicyCollection import PolicyCollection
+
+from util.collection.PolicyCollection import PolicyCollection
 
 folder = 'run/broadsearch_q_learning/2017-09-15_06-25-02/bin_flip_8/'
 

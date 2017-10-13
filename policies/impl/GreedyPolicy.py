@@ -19,19 +19,20 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
+import tensorflow as tf
 
-class Policy:
-    """Just the standard interface any policy has to full fill."""
+from policies.Policy import Policy
+
+
+class GreedyPolicy(Policy):
+    """This policy selects the action greedily."""
 
     def choose_action(self, q):
-        """This method of a policies_nn basically gets a Q function
-        and has to return the action to take now. Here you can
-        specify behaviour like taking the best action, or sometimes
-        different actions to them.
+        """Creates a graph, where the best action is selected.
 
         Args:
             q: The q function to use for evaluating.
-
-        Returns: The index of the action that should be taken
         """
-        raise NotImplementedError("Please implement choose_action method")
+
+        # get the number of states
+        return tf.cast(tf.argmax(q, axis=1), tf.int32)

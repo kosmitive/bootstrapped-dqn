@@ -22,7 +22,7 @@
 
 import tensorflow as tf
 
-from environments.open_ai_envs.ContinualStateEnv import ContinualStateEnv
+from environments.Environment import Environment
 from memory.Memory import Memory
 
 
@@ -44,11 +44,11 @@ class ExperienceReplayMemory(Memory):
         # check if this is a valid size
         assert size > 0
         assert sample_size <= size
-        assert isinstance(env, ContinualStateEnv)
+        assert isinstance(env, Environment)
         super().__init__(sample_size)
 
         # obtain the spaces
-        state_space = env.observation_space()
+        state_space = env.state_space
 
         # create a new variable scope
         with tf.variable_scope("replay_memory"):
@@ -59,7 +59,7 @@ class ExperienceReplayMemory(Memory):
             self.dones = tf.Variable(tf.zeros([size], dtype=tf.int32))
 
             # init state space size
-            state_size = state_space.dim()
+            state_size = state_space.D
             state_init = tf.zeros([size, state_size], dtype=tf.float32)
             self.current_states = tf.Variable(state_init)
             self.next_states = tf.Variable(state_init)

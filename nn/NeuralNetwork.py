@@ -20,11 +20,11 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-import extensions.python_extensions as pe
+import util.extensions.python_extensions as pe
 import numpy as np
 import tensorflow as tf
 
-import utils.extensions.tensorflow_extensions as tfe
+import util.extensions.tensorflow_extensions as tfe
 
 
 class NeuralNetwork:
@@ -213,3 +213,5 @@ class NeuralNetwork:
             Q = tfe.eval_fc_layer(Q, structure[-2:], layer_norm=self.conf['layer_norm'])
 
         return Q
+
+

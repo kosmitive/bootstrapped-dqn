@@ -24,7 +24,7 @@ import numpy as np
 import tensorflow as tf
 
 
-from utils.Space import Space
+from util.Space import Space
 
 
 class Environment:
@@ -58,12 +58,12 @@ class Environment:
             self.dones = tf.get_variable("dones", [N, 1], dtype=tf.bool)
             self.inc_expired_steps = tf.assign_add(self.expired_steps, tf.to_int32(tf.logical_not(self.dones)))
 
-            # build variables for current observations
+            # builder variables for current observations
             self.current_states = tf.get_variable("cur_states", [N, state_space.D])
             self.next_states = tf.get_variable("next_states", [N, state_space.D])
 
             # pipe only for active agents
-            next_current_state = tf.where(self.dones, self.current_states, self.next_states)
+            next_current_state = tf.where(tf.tile(self.dones, [1, state_space.D]), self.current_states, self.next_states)
             self.pipe_state = tf.assign(self.current_states, next_current_state)
 
             self.cum_rewards = tf.get_variable("rewards", [N, 1])
@@ -144,7 +144,7 @@ class Environment:
 
             # increase exp step and
             with tf.control_dependencies([self.inc_expired_steps, self.pipe_state]):
-                pipe_next = tf.assign(self.next_states, tf.where(self.dones, self.next_states, nsts))
+                pipe_next = tf.assign(self.next_states, tf.where(tf.tile(self.dones, [1, self.state_space.D]), self.next_states, nsts))
                 pipe_dns = tf.assign(self.dones, tf.logical_or(self.dones, dns))
 
                 count_rews = tf.assign_add(self.cum_rewards, tf.to_float(tf.logical_not(self.dones)) * rews)
@@ -152,7 +152,7 @@ class Environment:
 
             # make the observations available to the callee.
             with tf.control_dependencies([move_observation]):
-                return [tf.identity(rews), tf.identity(self.next_states), tf.reduce_all(dns)]
+                return [tf.identity(rews), tf.identity(self.next_states), tf.identity(dns))]
 
     def collect_run_data_graph(self):
         """This graph makes some evaluations to pass back to the callee, so that it can
