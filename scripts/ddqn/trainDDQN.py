@@ -8,14 +8,20 @@ from manager.DirectoryManager import DirectoryManager
 from plots.RewardValueFunctionPlot import RewardValueFunctionPlot
 from scripts.configurations import ddqn_general_ddqn_eps_config
 from scripts.configurations import ddqn_general_ddqn_greedy_config
+from scripts.configurations import ddqn_general_ddqn_zoneout_config
+from scripts.configurations import ddqn_general_ddqn_shakeout_config
+from scripts.configurations import ddqn_general_ddqn_dropout_config
 from scripts.connector import build_general_configuration
 
 # the run settings
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-batch = [["ddqn_eps", ddqn_general_ddqn_eps_config, "Epsilon-Greedy", 35],
-         ["ddqn_greedy", ddqn_general_ddqn_greedy_config, "Greedy", 36]]
+save_num = 1
+
+batch = [["ddqn_shakeout", ddqn_general_ddqn_zoneout_config, "Shakeout", 15]]
+         #["ddqn_dropout", ddqn_general_ddqn_dropout_config, "Dropout", 15],
+         #["ddqn_zoneout", ddqn_general_ddqn_zoneout_config, "Zoneout", 15]]
 
 # the settings for the framework
 epochs = 2500
@@ -25,7 +31,7 @@ save_plot = True
 save_best = True
 num_models = 5
 
-plot_as_variance = False
+plot_as_variance = True
 num_cpu = 16
 seed = 12
 
@@ -49,7 +55,7 @@ for [agent_name, config, suffix, seed] in batch:
     print(line_size * "=")
 
     # first of all join the names
-    dir_man = DirectoryManager(run_folder, name, "{}_{}".format(agent_name, seed))
+    dir_man = DirectoryManager(run_folder, name, "{}_{}_{}".format(agent_name, seed, save_num))
 
     # create the reward graph
     rewards = np.zeros((num_models, epochs))
@@ -111,6 +117,7 @@ for [agent_name, config, suffix, seed] in batch:
                 print(line_size * "=")
                 print("Training started at {}".format(datetime.datetime.now()))
                 print(line_size * "=")
+                dir_man.save_config(conf)
 
                 # Repeat for the number of epochs
                 for epoch in range(epochs):
@@ -170,9 +177,11 @@ for [agent_name, config, suffix, seed] in batch:
                         if save_best and np.mean(rewards, 0)[epoch] > best_reward:
                             best_reward = np.mean(rewards, 0)[epoch]
                             dir_man.save_plot(rew_va_plt, epoch, "best_rew_va.eps")
+                            dir_man.save_q_func(q_values, epoch, "best_q_func.npy")
 
                         if save_plot and epoch % save_epoch == 0:
                             dir_man.save_plot(rew_va_plt, epoch)
+                            dir_man.save_q_func(q_values, epoch)
 
                 tr_end = time.time()
                 print(line_size * "=")

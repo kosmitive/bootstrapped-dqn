@@ -60,9 +60,10 @@ class DeepNetwork:
         mask_assign = list()
         for si in range(1, len(self.structure) - 1):
             s = self.structure[si]
-            mask = tf.get_variable(name="m_{}".format(si), shape=[s], dtype=tf.int32)
+            dist = tf.distributions.Bernoulli(probs=probs).sample(sample_shape=[s])
+            mask = tf.Variable(dist, dtype=tf.int32)
             masks.append(mask)
-            mask_assign.append(tf.assign(mask, tf.distributions.Bernoulli(probs=probs).sample(sample_shape=[s])))
+            mask_assign.append(tf.assign(mask, dist))
 
         self.masks = [tf.cast(mask, tf.float32) for mask in masks]
         self.assign_masks = tf.group(*mask_assign)
@@ -109,7 +110,7 @@ class DeepNetwork:
                 if shakeout_masks is None:
                     x = Q @ W + b
                 else:
-                    q = 0.3
+                    q = 0.1
                     x = Q @ (W @ shakeout_masks[hidden_num - 1] + q * tf.sign(W) @ shakeout_masks[hidden_num - 1] - 1) + b
 
                 if layer_norm: x = layers.layer_norm(x, center=True, scale=True)
@@ -206,7 +207,7 @@ class DeepNetwork:
             reg += tf.nn.l2_loss(v)
 
         # Create a minimizer
-        optimizer = tf.train.RMSPropOptimizer(learning_rate)
+        optimizer = tf.train.AdamOptimizer(learning_rate)
         gradients = optimizer.compute_gradients(loss, var_list=self.log[self.scope])
         for i, (grad, var) in enumerate(gradients):
             if grad is not None:

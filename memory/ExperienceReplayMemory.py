@@ -10,19 +10,22 @@ class ExperienceReplayMemory(Memory):
     store the last N tuples.
     """
 
-    def __init__(self, size, sample_size, env):
+    def __init__(self, env, config):
         """Constructs a new ReplayMemory.
 
         Args:
-            size: The size of the replay memory.
-            sample_size: How much samples should be derived.
             env: The environment used for initialization
-            N: Define how much memories should be managed
+            config:
+                replay_size: The size of the replay memory.
+                sample_size: How much samples should be derived.
         """
 
+        replay_size = config['replay_size']
+        sample_size = config['sample_size']
+
         # check if this is a valid size
-        assert size > 0
-        assert sample_size <= size
+        assert replay_size > 0
+        assert sample_size <= replay_size
         assert isinstance(env, Environment)
 
         # obtain the spaces
@@ -32,18 +35,18 @@ class ExperienceReplayMemory(Memory):
         with tf.variable_scope("replay_memory"):
 
             # init action and reward value
-            self.actions = tf.Variable(tf.zeros([size], dtype=tf.int32))
-            self.rewards = tf.Variable(tf.zeros([size], dtype=tf.float32))
-            self.dones = tf.Variable(tf.zeros([size], dtype=tf.int32))
+            self.actions = tf.Variable(tf.zeros([replay_size], dtype=tf.int32))
+            self.rewards = tf.Variable(tf.zeros([replay_size], dtype=tf.float32))
+            self.dones = tf.Variable(tf.zeros([replay_size], dtype=tf.int32))
 
             # init state space size
             state_size = state_space.dim()
-            state_init = tf.zeros([size, state_size], dtype=tf.float32)
+            state_init = tf.zeros([replay_size, state_size], dtype=tf.float32)
             self.current_states = tf.Variable(state_init)
             self.next_states = tf.Variable(state_init)
 
             # save the current position
-            self.size = size
+            self.size = replay_size
             self.counter_init = tf.zeros([], dtype=tf.int32)
             self.count = tf.Variable(self.counter_init)
             self.current = tf.Variable(self.counter_init)

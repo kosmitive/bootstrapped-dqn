@@ -11,7 +11,7 @@ from agents.Agent import Agent
 class DDQNAgent(Agent):
     """this is the agent playing the game and trying to maximize the reward."""
 
-    def __init__(self, env, structure, config):
+    def __init__(self, env, config):
         """Constructs a BootstrappedDDQNAgent.
 
         Args:
@@ -38,13 +38,31 @@ class DDQNAgent(Agent):
         self.learning_rate = config['learning_rate']
 
         # init necessary objects
-        net_struct = [env.observation_space().dim()] + structure + [env.action_space().dim()]
+        net_struct = [env.observation_space().dim()] + config['structure'] + [env.action_space().dim()]
         self.network = DeepNetwork(net_struct, {"layer-norm" : True})
 
         # create iteration counter
         self.counter_init = tf.zeros([], dtype=tf.int32)
         self.iteration_counter = tf.Variable(0, trainable=False)
         self.global_step = tf.Variable(0, trainable=False)
+
+        use_dropout = 'regularization' in config and config['regularization'] == 'dropout'
+        use_zoneout = 'regularization' in config and config['regularization'] == 'zoneout'
+        use_shakeout = 'regularization' in config and config['regularization'] == 'shakeout'
+
+        if use_dropout or use_zoneout or use_shakeout:
+            self.mask_value = config['reg_rate_end'] - tfh.linear_decay(config['reg_steps_red'], config['reg_rate_end'] - config['reg_rate_begin'], 0.0, self.global_step)
+            self.sample = self.network.create_mask_graph(self.mask_value)
+            self.masks = self.network.get_mask_graph()
+
+        # create feed dict for zoneout and dropout
+        self.settings = {}
+        if use_dropout:
+            self.settings['dropout_masks'] = self.masks
+        elif use_zoneout:
+            self.settings['zoneout_masks'] = self.masks
+        elif use_shakeout:
+            self.settings['shakeout_masks'] = self.masks
 
     def copy_graph(self):
         self.network.switch('dqn')
@@ -69,7 +87,7 @@ class DDQNAgent(Agent):
 
         # choose appropriate action
         self.network.switch('dqn')
-        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0))
+        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0), **self.settings)
         return self.policy.choose_action(eval_graph)
 
     def observe_graph(self, current_observation, next_observation, action, reward, done):
@@ -80,11 +98,11 @@ class DDQNAgent(Agent):
 
         # get both q functions
         self.network.switch('dqn')
-        current_q = self.network.eval_graph(current_states, train=True)
+        current_q = self.network.eval_graph(current_states, train=True, **self.settings)
         next_q = self.network.eval_graph(next_states, train=True)
 
         self.network.switch('target')
-        target_next_q = self.network.eval_graph(next_states)
+        target_next_q = self.network.eval_graph(next_states, **self.settings)
         best_next_actions = tf.cast(tf.argmax(next_q, axis=1), tf.int32)
 
         sample_rng = tf.range(0, tf.size(actions), dtype=tf.int32)
