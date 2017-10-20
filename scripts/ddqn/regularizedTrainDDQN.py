@@ -9,12 +9,6 @@ from plots.RewardValueFunctionPlot import RewardValueFunctionPlot
 from scripts.configurations import ddqn_general_ddqn_eps_config
 from scripts.configurations import ddqn_general_ddqn_greedy_config
 from scripts.configurations import ddqn_general_ddqn_zoneout_config
-from scripts.configurations import ddqn_general_ddqn_zoneout_config_constant
-from scripts.configurations import ddqn_general_ddqn_dropout_config_constant
-from scripts.configurations import ddqn_general_ddqn_shakeout_config_constant
-from scripts.configurations import ddqn_general_ddqn_regularized_zoneout_config
-from scripts.configurations import ddqn_general_ddqn_regularized_dropout_config
-from scripts.configurations import ddqn_general_ddqn_regularized_shakeout_config
 from scripts.configurations import ddqn_general_ddqn_shakeout_config
 from scripts.configurations import ddqn_general_ddqn_dropout_config
 from scripts.connector import build_general_configuration
@@ -23,13 +17,11 @@ from scripts.connector import build_general_configuration
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-save_num = 0
+save_num = 1
 
-batch = [#["ddqn_reg_zoneout", ddqn_general_ddqn_regularized_zoneout_config, "RegZoneout", 15],
-         #["ddqn_reg_dropout", ddqn_general_ddqn_regularized_dropout_config, "RegDropout", 15]]
-         #["ddqn_shakeout_c", ddqn_general_ddqn_shakeout_config_constant, "ShakeoutC", 15],
-         ["ddqn_dropout_c", ddqn_general_ddqn_dropout_config_constant, "DropoutC", 15],
-         ["ddqn_zoneout_c", ddqn_general_ddqn_zoneout_config_constant, "ZoneoutC", 15]]
+batch = [["ddqn_shakeout", ddqn_general_ddqn_zoneout_config, "Shakeout", 15]]
+         #["ddqn_dropout", ddqn_general_ddqn_dropout_config, "Dropout", 15],
+         #["ddqn_zoneout", ddqn_general_ddqn_zoneout_config, "Zoneout", 15]]
 
 # the settings for the framework
 epochs = 2500
@@ -126,11 +118,10 @@ for [agent_name, config, suffix, seed] in batch:
                 print("Training started at {}".format(datetime.datetime.now()))
                 print(line_size * "=")
                 dir_man.save_config(conf)
-                sample_masks = [agent.sample_as_masks for agent in agents]
 
                 # Repeat for the number of epochs
                 for epoch in range(epochs):
-                    res, _ = sess.run([env_res_op, sample_masks])
+                    res = sess.run(env_res_op)
 
                     if is2d:
                         obs_buffer = np.empty([201, 2], dtype=np.float32)

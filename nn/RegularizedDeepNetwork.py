@@ -4,7 +4,7 @@ import tensorflow as tf
 import tensorflow.contrib.layers as layers
 
 
-class DeepNetwork:
+class RegularizedDeepNetwork:
     """This represents a general DeepNetwork. It can be used in different
     types of contexts. In general it operates on batches of 1-dimensional
     data. Several copies can be created with the set_scope function."""
@@ -65,15 +65,14 @@ class DeepNetwork:
             masks.append(mask)
             mask_assign.append(tf.assign(mask, dist))
 
-        self.masks = [tf.cast(tf.expand_dims(mask, 0), tf.float32) for mask in masks]
-        self.assign_masks = tf.group(*mask_assign)
+        masks = [tf.cast(mask, tf.float32) for mask in masks]
+        assign_masks = tf.group(*mask_assign)
 
-        return self.assign_masks
+        return masks, assign_masks
 
     def get_mask_graph(self):
 
         return self.masks
-
 
     def eval_graph(self, input, dropout_masks = None, zoneout_masks = None, shakeout_masks = None, layer_norm=True, train=False, seed=17):
         """This creates the graph it therefore receives the input tensor and
@@ -110,15 +109,15 @@ class DeepNetwork:
                 if shakeout_masks is None:
                     x = Q @ W + b
                 else:
-                    q = 0.1
+                    q = 0.2
                     x = Q @ (W * shakeout_masks[hidden_num - 1] + q * tf.sign(W) * shakeout_masks[hidden_num - 1] - 1) + b
 
                 if layer_norm: x = layers.layer_norm(x, center=True, scale=True)
-                if dropout_masks is not None: x = dropout_masks[hidden_num - 1] * x
+                if dropout_masks is not None: x = tf.expand_dims(dropout_masks[hidden_num - 1], 0) * x
 
                 pQ = self.lrelu(x)
                 if zoneout_masks is not None and hidden_num > 1:
-                    exp_mask = zoneout_masks[hidden_num - 2]
+                    exp_mask = tf.expand_dims(zoneout_masks[hidden_num - 2], 0)
                     Q = exp_mask * pQ + (1 - exp_mask) * Q
                 else:
                     Q = pQ

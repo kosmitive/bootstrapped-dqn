@@ -52,7 +52,7 @@ class DDQNAgent(Agent):
 
         if use_dropout or use_zoneout or use_shakeout:
             self.mask_value = config['reg_rate_end'] - tfh.linear_decay(config['reg_steps_red'], config['reg_rate_end'] - config['reg_rate_begin'], 0.0, self.global_step)
-            self.sample = self.network.create_mask_graph(self.mask_value)
+            self.sample_as_masks = self.network.create_mask_graph(self.mask_value)
             self.masks = self.network.get_mask_graph()
 
         # create feed dict for zoneout and dropout
