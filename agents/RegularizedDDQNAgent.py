@@ -108,12 +108,45 @@ class RegularizedDDQNAgent(Agent):
 
         # choose appropriate action
         self.network.switch('dqn')
-        mask_dict = {self.settings: self.as_masks[0]}
-        eval_graph = self.network.eval_graph(tf.expand_dims(current_observation, 0), **mask_dict)
-        for k in range(1, self.K):
+        evals = list()
+        for k in range(0, self.K):
             mask_dict = {self.settings: self.as_masks[k]}
-            eval_graph += self.network.eval_graph(tf.expand_dims(current_observation, 0), **mask_dict)
-        return self.policy.choose_action(eval_graph / self.K)
+            evals.append(self.network.eval_graph(tf.expand_dims(current_observation, 0), **mask_dict))
+
+        # build the mean
+        mean_graph = evals[0]
+        for k in range(1, self.K):
+            mean_graph += evals[0]
+        mean_graph /= self.K
+
+        var_graph = tf.pow(evals[0] - mean_graph, 2)
+        for k in range(1, self.K):
+            var_graph += tf.pow(evals[k] - mean_graph, 2)
+        var_graph /= self.K
+
+        action = self.policy.choose_action(mean_graph + 0.005 * var_graph)
+        # calculate info gain
+        T = 0.9
+        boltz_list = list()
+        for k in range(self.K):
+            softmax = tf.nn.softmax(evals[k] / T)
+            boltz_list.append(softmax)
+
+        # build the average
+        avg = boltz_list[0]
+        for k in range(1, self.K):
+            avg += boltz_list[k]
+
+        avg /= self.K
+
+        kl_term = tf.constant(0.0)
+        for k in range(self.K):
+            kl_term += self.kl_divergence(tf.squeeze(boltz_list[k]), tf.squeeze(avg))
+
+        return action, kl_term
+
+    def kl_divergence(self, p, q):
+        return tf.reduce_sum(p * tf.log(p / q))
 
     def observe_graph(self, current_observation, next_observation, action, reward, done):
         assert self.memory is not None

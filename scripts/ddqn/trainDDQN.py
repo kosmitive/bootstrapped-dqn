@@ -23,13 +23,13 @@ from scripts.connector import build_general_configuration
 name = "MountainCar-v0"
 run_folder = "./run/"
 
-save_num = 0
+save_num = 10
 
-batch = [#["ddqn_reg_zoneout", ddqn_general_ddqn_regularized_zoneout_config, "RegZoneout", 15],
-         #["ddqn_reg_dropout", ddqn_general_ddqn_regularized_dropout_config, "RegDropout", 15]]
+batch = [["ddqn_reg_zoneoutInfo", ddqn_general_ddqn_regularized_zoneout_config, "RegZoneoutInfo", 15],
+         ["ddqn_reg_shaekoutInfo", ddqn_general_ddqn_regularized_shakeout_config, "RegShakeoutInfo", 15]]
          #["ddqn_shakeout_c", ddqn_general_ddqn_shakeout_config_constant, "ShakeoutC", 15],
-         ["ddqn_dropout_c", ddqn_general_ddqn_dropout_config_constant, "DropoutC", 15],
-         ["ddqn_zoneout_c", ddqn_general_ddqn_zoneout_config_constant, "ZoneoutC", 15]]
+         #["ddqn_dropout_c", ddqn_general_ddqn_dropout_config_constant, "DropoutC", 15],
+         #["ddqn_zoneout_c", ddqn_general_ddqn_zoneout_config_constant, "ZoneoutC", 15]]
 
 # the settings for the framework
 epochs = 2500

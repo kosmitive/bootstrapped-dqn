@@ -18,14 +18,21 @@ def build_general_configuration(env, agents, memories, policies):
     [agents[k].register_policy(policies[k]) for k in range(num_models)]
 
     actionlst = list()
+    info_bonus = list()
     for k in range(num_models):
         with tf.variable_scope(str(k)):
-            actionlst.append(agents[k].action_graph(current_observation[k, :]))
+            act, info = agents[k].action_graph(current_observation[k, :])
+            actionlst.append(act)
+            info_bonus.append(info)
 
     actions = tf.stack(actionlst, 0)
 
     # execute action
-    next_observation, rewards, dones, real_dones = env.step_graph(actions)
+    next_observation, trewards, dones, real_dones = env.step_graph(actions)
+
+    rewards = list()
+    for k in range(num_models):
+        rewards.append(trewards[k] + 0.1 * info_bonus[k])
 
     # create the learn graph
     minimizer = list()
